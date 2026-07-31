@@ -2,6 +2,7 @@
   "name": "coding-docs",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "pnpm@11.18.0",
   "scripts": {
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
