@@ -1,4 +1,4 @@
-# 认识 Jenkins
+# 01 认识 Jenkins
 
 ## 1. Jenkins 是什么？
 
@@ -93,20 +93,11 @@ Jenkins 本体很精简，能力全靠插件扩展：Git 拉代码是插件、SS
 
 以「前端项目自动部署」为例，梳理一遍全流程，建立整体印象：
 
-```text
-开发者 git push 到仓库
-        │
-        ▼ (Webhook 通知)
-Jenkins 收到通知，触发 Job
-        │
-        ▼
-stage 1  拉取最新代码
-stage 2  npm install 安装依赖
-stage 3  npm run build 打包
-stage 4  把 dist/ 传到服务器，重载 Nginx
-        │
-        ▼
-构建结果通知（邮件/钉钉/企业微信）
+```mermaid
+flowchart TD
+    push["开发者 git push 到仓库"] -->|Webhook 通知| trigger["Jenkins 收到通知，触发 Job"]
+    trigger --> stages["stage 1 拉取最新代码<br/>stage 2 npm install 安装依赖<br/>stage 3 npm run build 打包<br/>stage 4 把 dist/ 传到服务器，重载 Nginx"]
+    stages --> notify["构建结果通知（邮件 / 钉钉 / 企业微信）"]
 ```
 
 后面的章节就是把这条旅程一步步搭出来：先装 Jenkins（第 2 章），再学 Jenkinsfile 语法（第 3 章），最后分别实战前端、Python、Go 三类项目的部署（第 4~6 章）。

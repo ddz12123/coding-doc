@@ -1,15 +1,11 @@
 services:
   coding-docs:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: coding-docs:latest
+    image: nginx:1.27-alpine
     container_name: coding-docs
     ports:
-      - "8080:80"
+      - "8002:80"
+    volumes:
+      # 静态产物目录：本地构建后上传 build/ 到服务器该目录即可，无需重启容器
+      - ./build:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3

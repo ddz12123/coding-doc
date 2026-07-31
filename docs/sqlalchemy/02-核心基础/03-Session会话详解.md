@@ -80,19 +80,15 @@ with Session(engine) as session:
 
 一个模型对象相对于 Session 有四种状态：
 
-```
-              session.add()              session.commit()/flush()
-  Transient ──────────────→  Pending ──────────────────────→  Persistent
-  （游离态）                  （待定态）                        （持久态）
-  刚 new 出来                进了购物车                        数据库里有对应行
-  和数据库无关                还没写库                          且被 session 跟踪
-                                                                  │
-                                                                  │ session.close()
-                                                                  ↓
-                                                              Detached
-                                                              （脱管态）
-                                                              数据库里有行，
-                                                              但没有 session 跟踪它了
+```mermaid
+flowchart LR
+    t["Transient（游离态）<br/>刚 new 出来，和数据库无关"]
+    p["Pending（待定态）<br/>进了购物车，还没写库"]
+    per["Persistent（持久态）<br/>数据库里有对应行，且被 session 跟踪"]
+    d["Detached（脱管态）<br/>数据库里有行，但没有 session 跟踪它了"]
+    t -->|"session.add()"| p
+    p -->|"session.commit() / flush()"| per
+    per -->|"session.close()"| d
 ```
 
 ```python
@@ -118,7 +114,7 @@ with Session(engine) as session:
 print(user.posts)   # ❌ 可能报错 DetachedInstanceError！
 ```
 
-为什么？`user.posts` 这类**关系属性是懒加载的**——访问时才去查数据库，而此时 Session 已经关了，没法查了。解决办法在 [4.4 关系加载策略](../04-表关系/04-关系加载策略.md) 详讲。现在先记住现象：**尽量在 Session 存活期间用完对象**。
+为什么？`user.posts` 这类**关系属性是懒加载的**——访问时才去查数据库，而此时 Session 已经关了，没法查了。解决办法在 [4.4 关系加载策略与 N+1 问题](../04-表关系/04-关系加载策略.md) 详讲。现在先记住现象：**尽量在 Session 存活期间用完对象**。
 
 ## 六、commit / rollback / flush 深入理解
 

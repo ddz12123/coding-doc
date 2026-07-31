@@ -1,23 +1,368 @@
 /**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
+ * 首页局部样式（CSS Modules）
  */
 
-.heroBanner {
-  padding: 4rem 0;
+/* ===== Hero ===== */
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 6rem 0 4.5rem;
+  background:
+    radial-gradient(ellipse 60% 80% at 15% -10%, rgba(46, 133, 85, 0.22), transparent),
+    radial-gradient(ellipse 50% 70% at 90% 0%, rgba(37, 194, 160, 0.16), transparent),
+    var(--ifm-background-color);
+}
+
+[data-theme='dark'] .hero {
+  background:
+    radial-gradient(ellipse 60% 80% at 15% -10%, rgba(46, 133, 85, 0.3), transparent),
+    radial-gradient(ellipse 50% 70% at 90% 0%, rgba(37, 194, 160, 0.18), transparent),
+    var(--ifm-background-color);
+}
+
+.heroGlow {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(46, 133, 85, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(46, 133, 85, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 0%, #000 30%, transparent 75%);
+  pointer-events: none;
+}
+
+.heroInner {
+  position: relative;
   text-align: center;
+  max-width: 860px;
+}
+
+.heroBadge {
+  display: inline-block;
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(46, 133, 85, 0.35);
+  background: rgba(46, 133, 85, 0.08);
+  color: var(--ifm-color-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+.heroTitle {
+  font-size: 3.4rem;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 1.25rem;
+}
+
+.heroTitleAccent {
+  display: inline-block;
+  margin-left: 0.4rem;
+  background: linear-gradient(120deg, #2e8555, #25c2a0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.heroSubtitle {
+  font-size: 1.15rem;
+  line-height: 1.8;
+  color: var(--ifm-color-emphasis-700);
+  margin-bottom: 2.25rem;
+}
+
+.heroActions {
+  display: flex;
+  gap: 0.9rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 3rem;
+}
+
+.heroPrimaryBtn {
+  padding: 0.8rem 2rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #fff;
+  background: linear-gradient(120deg, #2e8555, #1fa588);
+  box-shadow: 0 8px 24px rgba(46, 133, 85, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.heroPrimaryBtn:hover {
+  color: #fff;
+  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(46, 133, 85, 0.45);
+}
+
+.heroSecondaryBtn {
+  padding: 0.8rem 2rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ifm-font-color-base);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.heroSecondaryBtn:hover {
+  color: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.heroStats {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.heroStat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.heroStat strong {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--ifm-color-primary);
+}
+
+.heroStat span {
+  font-size: 0.85rem;
+  color: var(--ifm-color-emphasis-600);
+}
+
+.heroStatDivider {
+  width: 1px;
+  height: 2.4rem;
+  background: var(--ifm-color-emphasis-300);
+}
+
+/* ===== 通用 Section ===== */
+.section {
+  padding: 4.5rem 0;
+}
+
+.sectionAlt {
+  background: var(--ifm-color-emphasis-100);
+}
+
+[data-theme='dark'] .sectionAlt {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sectionHead {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto 3rem;
+}
+
+.sectionTitle {
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.6rem;
+}
+
+.sectionSubtitle {
+  color: var(--ifm-color-emphasis-600);
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* ===== 课程卡片 ===== */
+.courseGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.4rem;
+}
+
+.courseCard {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  border-radius: 16px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   position: relative;
   overflow: hidden;
 }
 
+.courseCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.courseCard:hover {
+  text-decoration: none;
+  color: var(--ifm-font-color-base);
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.08);
+}
+
+.courseCard:hover::before {
+  opacity: 1;
+}
+
+.courseIcon {
+  font-size: 2.2rem;
+  line-height: 1;
+  margin-bottom: 1rem;
+}
+
+.courseTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.courseDesc {
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--ifm-color-emphasis-700);
+  flex-grow: 1;
+  margin-bottom: 1rem;
+}
+
+.courseTags {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.courseTag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--ifm-color-emphasis-100);
+  color: var(--ifm-color-emphasis-700);
+}
+
+.courseMore {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ifm-color-primary);
+}
+
+/* ===== 学习路线 ===== */
+.pathGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.4rem;
+}
+
+.pathCard {
+  padding: 1.75rem;
+  border-radius: 16px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  background: var(--ifm-background-surface-color);
+}
+
+.pathHead {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+}
+
+.pathEmoji {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.pathName {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.pathSteps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.pathStepWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pathStep {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(46, 133, 85, 0.1);
+  color: var(--ifm-color-primary);
+}
+
+.pathArrow {
+  color: var(--ifm-color-emphasis-500);
+  font-size: 0.85rem;
+}
+
+.pathNote {
+  font-size: 0.88rem;
+  color: var(--ifm-color-emphasis-600);
+  margin: 0;
+}
+
+/* ===== 响应式 ===== */
 @media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: 2rem;
+  .hero {
+    padding: 4rem 0 3rem;
+  }
+
+  .heroTitle {
+    font-size: 2.4rem;
+  }
+
+  .courseGrid,
+  .pathGrid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-.buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+@media screen and (max-width: 640px) {
+  .heroTitle {
+    font-size: 1.9rem;
+  }
+
+  .heroSubtitle {
+    font-size: 1rem;
+  }
+
+  .heroStats {
+    gap: 1.2rem;
+  }
+
+  .courseGrid,
+  .pathGrid {
+    grid-template-columns: 1fr;
+  }
 }

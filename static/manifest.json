@@ -1,0 +1,23 @@
+{
+  "name": "编程学习文档",
+  "short_name": "编程文档",
+  "description": "Python / Go / MySQL / Redis / FastAPI / SQLAlchemy 入门到实战教程",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2e8555",
+  "lang": "zh-Hans",
+  "icons": [
+    {
+      "src": "/img/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/img/docusaurus.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

@@ -90,20 +90,13 @@ def get_user(user_id: int, db: DbSession):
 
 以"注册用户"为例，看两套模型如何接力：
 
-```
-客户端 JSON  {"name":"张三","email":"zs@qq.com","password":"123456"}
-    │
-    ▼ ① Pydantic 入场：校验
-UserCreate(name='张三', email='zs@qq.com', password='123456')
-    │
-    ▼ ② 业务代码：转成 ORM 对象（密码要哈希！）
-User(name='张三', email='zs@qq.com', hashed_password='$2b$...')
-    │
-    ▼ ③ SQLAlchemy 入场：入库
-db.add(user); db.commit()          # user.id、created_at 被数据库填好
-    │
-    ▼ ④ Pydantic 再入场：过滤输出
-response_model=UserOut → {"id":1,"name":"张三","email":"zs@qq.com","created_at":"..."}
+```mermaid
+flowchart TD
+    json["客户端 JSON<br/>{&quot;name&quot;:&quot;张三&quot;,&quot;email&quot;:&quot;zs@qq.com&quot;,&quot;password&quot;:&quot;123456&quot;}"]
+    json -->|"① Pydantic 入场：校验"| pyd["UserCreate(name='张三', email='zs@qq.com', password='123456')"]
+    pyd -->|"② 业务代码：转成 ORM 对象（密码要哈希！）"| orm["User(name='张三', email='zs@qq.com', hashed_password='$2b$...')"]
+    orm -->|"③ SQLAlchemy 入场：入库"| db["db.add(user); db.commit()<br/>user.id、created_at 被数据库填好"]
+    db -->|"④ Pydantic 再入场：过滤输出"| out["response_model=UserOut<br/>{&quot;id&quot;:1,&quot;name&quot;:&quot;张三&quot;,&quot;email&quot;:&quot;zs@qq.com&quot;,&quot;created_at&quot;:&quot;...&quot;}"]
 ```
 
 代码实现：

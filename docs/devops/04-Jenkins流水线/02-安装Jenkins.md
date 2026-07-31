@@ -1,4 +1,4 @@
-# 安装 Jenkins
+# 02 安装 Jenkins
 
 本章用 **Docker Compose** 安装 Jenkins——正好把前面学的 Compose 知识用上，装、升级、迁移都比裸装省心。
 

@@ -1,3 +1,7 @@
+---
+sidebar_position: 0
+---
+
 # Go 语言新手入门教程
 
 > 一份写给**第一次接触 Go 语言**的新手的完整教程。不需要你有任何 Go 基础，只要会用电脑、了解一点点编程的基本概念（比如什么是变量）就可以开始。
@@ -17,59 +21,59 @@
 
 ## 目录
 
-### 第一章：入门准备（01-getting-started）
+### 第一章：入门准备（01-入门准备）
 
 | 文件 | 内容 |
 |------|------|
-| [01 认识 Go 语言](01-getting-started/01-what-is-go.md) | Go 是什么、为什么学 Go、Go 能做什么 |
-| [02 安装 Go 开发环境](01-getting-started/02-install.md) | Windows / macOS / Linux 安装、配置编辑器 |
-| [03 第一个程序 Hello World](01-getting-started/03-hello-world.md) | 写出并运行你的第一个 Go 程序、逐行解释 |
-| [04 Go 命令与模块初识](01-getting-started/04-go-toolchain.md) | go run / build / mod 等常用命令 |
+| [1.1 认识 Go 语言](01-入门准备/01-what-is-go.md) | Go 是什么、为什么学 Go、Go 能做什么 |
+| [1.2 安装 Go 开发环境](01-入门准备/02-install.md) | Windows / macOS / Linux 安装、配置编辑器 |
+| [1.3 第一个程序 Hello World](01-入门准备/03-hello-world.md) | 写出并运行你的第一个 Go 程序、逐行解释 |
+| [1.4 Go 命令与模块初识](01-入门准备/04-go-toolchain.md) | go run / build / mod 等常用命令 |
 
-### 第二章：基础语法（02-basics）
-
-| 文件 | 内容 |
-|------|------|
-| [01 变量与常量](02-basics/01-variables-constants.md) | 变量声明的几种方式、常量、iota |
-| [02 基本数据类型](02-basics/02-data-types.md) | 整数、浮点数、布尔、字符串、类型转换 |
-| [03 运算符](02-basics/03-operators.md) | 算术、比较、逻辑运算符 |
-| [04 流程控制](02-basics/04-flow-control.md) | if / for / switch，Go 只有一种循环 |
-| [05 函数](02-basics/05-functions.md) | 函数定义、多返回值、defer |
-
-### 第三章：复合数据类型（03-composite-types）
+### 第二章：基础语法（02-基础语法）
 
 | 文件 | 内容 |
 |------|------|
-| [01 数组与切片](03-composite-types/01-arrays-slices.md) | 数组、切片（最常用的数据结构）、append |
-| [02 map 映射](03-composite-types/02-maps.md) | 键值对、增删改查、遍历 |
-| [03 结构体](03-composite-types/03-structs.md) | 自定义类型、字段、嵌套 |
-| [04 指针](03-composite-types/04-pointers.md) | 新手也能懂的指针讲解 |
+| [2.1 变量与常量](02-基础语法/01-variables-constants.md) | 变量声明的几种方式、常量、iota |
+| [2.2 基本数据类型](02-基础语法/02-data-types.md) | 整数、浮点数、布尔、字符串、类型转换 |
+| [2.3 运算符](02-基础语法/03-operators.md) | 算术、比较、逻辑运算符 |
+| [2.4 流程控制](02-基础语法/04-flow-control.md) | if / for / switch，Go 只有一种循环 |
+| [2.5 函数](02-基础语法/05-functions.md) | 函数定义、多返回值、defer |
 
-### 第四章：方法、接口与错误处理（04-methods-interfaces）
-
-| 文件 | 内容 |
-|------|------|
-| [01 方法](04-methods-interfaces/01-methods.md) | 给类型绑定行为、值接收者与指针接收者 |
-| [02 接口](04-methods-interfaces/02-interfaces.md) | Go 最有特色的设计、鸭子类型 |
-| [03 错误处理](04-methods-interfaces/03-error-handling.md) | error、errors 包、panic 与 recover |
-| [04 泛型入门](04-methods-interfaces/04-generics.md) | Go 1.18+ 的泛型基础 |
-
-### 第五章：并发编程（05-concurrency）
+### 第三章：复合数据类型（03-复合数据类型）
 
 | 文件 | 内容 |
 |------|------|
-| [01 goroutine](05-concurrency/01-goroutines.md) | 轻量级并发、Go 的招牌能力 |
-| [02 channel 通道](05-concurrency/02-channels.md) | goroutine 之间的通信 |
-| [03 sync 与并发安全](05-concurrency/03-sync.md) | WaitGroup、Mutex、常见并发陷阱 |
+| [3.1 数组与切片](03-复合数据类型/01-arrays-slices.md) | 数组、切片（最常用的数据结构）、append |
+| [3.2 map 映射](03-复合数据类型/02-maps.md) | 键值对、增删改查、遍历 |
+| [3.3 结构体](03-复合数据类型/03-structs.md) | 自定义类型、字段、嵌套 |
+| [3.4 指针](03-复合数据类型/04-pointers.md) | 新手也能懂的指针讲解 |
 
-### 第六章：工程实践（06-project-practice）
+### 第四章：方法、接口与错误处理（04-方法与接口）
 
 | 文件 | 内容 |
 |------|------|
-| [01 包与模块管理](06-project-practice/01-packages-modules.md) | 多文件多包组织代码、go mod 详解 |
-| [02 单元测试](06-project-practice/02-testing.md) | go test、表驱动测试 |
-| [03 常用标准库速览](06-project-practice/03-stdlib.md) | fmt / strings / strconv / time / os / json |
-| [04 实战项目：命令行待办清单](06-project-practice/04-project-todo-cli.md) | 综合运用所学，完成一个真实小项目 |
+| [4.1 方法](04-方法与接口/01-methods.md) | 给类型绑定行为、值接收者与指针接收者 |
+| [4.2 接口](04-方法与接口/02-interfaces.md) | Go 最有特色的设计、鸭子类型 |
+| [4.3 错误处理](04-方法与接口/03-error-handling.md) | error、errors 包、panic 与 recover |
+| [4.4 泛型入门](04-方法与接口/04-generics.md) | Go 1.18+ 的泛型基础 |
+
+### 第五章：并发编程（05-并发编程）
+
+| 文件 | 内容 |
+|------|------|
+| [5.1 goroutine：轻量级并发](05-并发编程/01-goroutines.md) | 轻量级并发、Go 的招牌能力 |
+| [5.2 channel 通道](05-并发编程/02-channels.md) | goroutine 之间的通信 |
+| [5.3 sync 与并发安全](05-并发编程/03-sync.md) | WaitGroup、Mutex、常见并发陷阱 |
+
+### 第六章：工程实践（06-项目实战）
+
+| 文件 | 内容 |
+|------|------|
+| [6.1 包与模块管理](06-项目实战/01-packages-modules.md) | 多文件多包组织代码、go mod 详解 |
+| [6.2 单元测试](06-项目实战/02-testing.md) | go test、表驱动测试 |
+| [6.3 常用标准库速览](06-项目实战/03-stdlib.md) | fmt / strings / strconv / time / os / json |
+| [6.4 实战项目：命令行待办清单](06-项目实战/04-project-todo-cli.md) | 综合运用所学，完成一个真实小项目 |
 
 ## 学习路线建议
 

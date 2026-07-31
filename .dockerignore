@@ -4,8 +4,7 @@ build
 .docusaurus
 .cache-loader
 
-# 版本控制
-.git
+# 版本控制（保留 .git：构建时需要 git 历史生成文档"最后更新时间"）
 .gitignore
 
 # Docker 自身文件

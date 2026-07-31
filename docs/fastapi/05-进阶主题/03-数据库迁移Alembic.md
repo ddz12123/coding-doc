@@ -1,4 +1,4 @@
-# 03 数据库迁移（Alembic）
+# 5.3 数据库迁移（Alembic）
 
 本章目标：学会用 Alembic 管理数据库表结构的变更——这是 `create_all` 的正式替代方案，上线项目必备。
 
@@ -142,4 +142,4 @@ fastapi run app/main.py
 - 迁移脚本提交 git；`downgrade` 提供回滚能力
 - 接入 Alembic 后移除 create_all
 
-下一章：[04-自动化测试](04-自动化测试.md)
+下一章：[5.4 自动化测试](04-自动化测试.md)

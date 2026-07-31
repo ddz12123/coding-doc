@@ -1,6 +1,6 @@
 # 6.1 FastAPI 快速入门
 
-> 在把 SQLAlchemy 接进来之前，先用 30 分钟认识 FastAPI 本身：路由、参数、Pydantic 模型、自动文档。已会 FastAPI 的读者可跳到 [6.2](02-依赖注入与数据库会话.md)。
+> 在把 SQLAlchemy 接进来之前，先用 30 分钟认识 FastAPI 本身：路由、参数、Pydantic 模型、自动文档。已会 FastAPI 的读者可跳到 [6.2 依赖注入：管理数据库会话](02-依赖注入与数据库会话.md)。
 
 ## 一、FastAPI 是什么？
 
@@ -197,4 +197,4 @@ def delete_user(user_id: int):
 - `response_model` 定义出参并过滤多余字段；错误用 `raise HTTPException`
 - `/docs` 是你最好的调试伙伴
 
-下一节，把数据库会话优雅地接进来 → [6.2 依赖注入与数据库会话](02-依赖注入与数据库会话.md)
+下一节，把数据库会话优雅地接进来 → [6.2 依赖注入：管理数据库会话](02-依赖注入与数据库会话.md)

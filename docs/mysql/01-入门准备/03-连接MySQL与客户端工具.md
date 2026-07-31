@@ -1,4 +1,4 @@
-# 03 连接 MySQL 与客户端工具
+# 1.3 连接 MySQL 与客户端工具
 
 ## 📖 本节导读
 
@@ -259,6 +259,3 @@ MySQL 官方出品，**免费**。功能全面，包含 SQL 编辑器、表设�
 会看到 4 个系统自带数据库：`information_schema`、`mysql`、`performance_schema`、`sys`。它们存放 MySQL 自身运行所需的元数据和配置信息，不能随意修改或删除，否则可能导致 MySQL 无法正常工作。
 
 </details>
-
----
-[⬅ 上一节](02-安装MySQL.md) | [🏠 返回目录](../README.md) | [下一节 ➡](../02-SQL基础/01-数据库的基本操作.md)

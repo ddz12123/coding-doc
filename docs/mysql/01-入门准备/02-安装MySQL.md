@@ -1,4 +1,4 @@
-# 02 安装 MySQL
+# 1.2 安装 MySQL
 
 ## 📖 本节导读
 
@@ -225,6 +225,3 @@ MySQL 8 在 Windows 上默认的服务名是 `MySQL80` 而不是 `mysql`，应�
 核心思路分三步：① 停止 MySQL 服务，以跳过权限验证（--skip-grant-tables）的方式启动；② 免密登录后用 `ALTER USER` 语句修改 root 密码；③ 恢复正常方式重启服务，用新密码登录。
 
 </details>
-
----
-[⬅ 上一节](01-认识数据库与MySQL.md) | [🏠 返回目录](../README.md) | [下一节 ➡](03-连接MySQL与客户端工具.md)

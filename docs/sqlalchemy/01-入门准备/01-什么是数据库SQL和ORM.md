@@ -134,22 +134,15 @@ SQLAlchemy 会在幕后自动生成 SQL、执行、再把结果打包成 `User` 
 
 它其实分为两层，理解这一点对后续学习很重要：
 
-```
-┌──────────────────────────────────┐
-│         SQLAlchemy ORM           │  ← 面向对象层：User 类、Session、relationship
-│  （本教程的主角）                  │
-├──────────────────────────────────┤
-│         SQLAlchemy Core          │  ← 底层：Engine、连接池、SQL 表达式、方言
-│  （ORM 构建在它之上）              │
-└──────────────────────────────────┘
-              ↓ 生成 SQL
-┌──────────────────────────────────┐
-│   数据库驱动 (sqlite3 / pymysql)  │
-└──────────────────────────────────┘
-              ↓
-┌──────────────────────────────────┐
-│   数据库 (SQLite / MySQL / PG)    │
-└──────────────────────────────────┘
+```mermaid
+flowchart TD
+    orm["SQLAlchemy ORM（本教程的主角）<br/>面向对象层：User 类、Session、relationship"]
+    core["SQLAlchemy Core（ORM 构建在它之上）<br/>底层：Engine、连接池、SQL 表达式、方言"]
+    driver["数据库驱动（sqlite3 / pymysql）"]
+    db[("数据库（SQLite / MySQL / PG）")]
+    orm --> core
+    core -->|生成 SQL| driver
+    driver --> db
 ```
 
 - **Core**：负责连接数据库、管理连接池、构建 SQL。你会接触到它的 `create_engine`、`text()` 等。
@@ -163,10 +156,13 @@ SQLAlchemy 会在幕后自动生成 SQL、执行、再把结果打包成 `User` 
 
 **FastAPI** 是目前最热门的 Python Web 框架：性能高、写法现代、自动生成接口文档。它和 SQLAlchemy 是当下 Python 后端最主流的组合之一：
 
-```
-浏览器/App → HTTP请求 → FastAPI(路由) → SQLAlchemy(ORM) → 数据库
-                            ↑                              │
-浏览器/App ← JSON响应 ← FastAPI(序列化) ←──── User对象 ←────┘
+```mermaid
+flowchart LR
+    client["浏览器 / App"] -->|HTTP 请求| route["FastAPI（路由）"]
+    route --> orm["SQLAlchemy（ORM）"]
+    orm --> db[(数据库)]
+    db -->|User 对象| ser["FastAPI（序列化）"]
+    ser -->|JSON 响应| client
 ```
 
 第 6、7 章我们会完整实现这条链路。

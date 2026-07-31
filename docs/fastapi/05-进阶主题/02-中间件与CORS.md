@@ -1,4 +1,4 @@
-# 02 中间件与 CORS
+# 5.2 中间件与 CORS
 
 本章目标：理解中间件的概念，解决前端联调必遇的 CORS 跨域问题，并写一个请求日志中间件。本章较短，但 CORS 部分实战中 100% 会用到。
 
@@ -119,4 +119,4 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["api.example.com"])
 - 生产环境 `allow_origins` 必须写具体域名，不能用 `*`
 - 自定义中间件的固定模板：处理前逻辑 → `await call_next(request)` → 处理后逻辑
 
-下一章：[03-数据库迁移Alembic](03-数据库迁移Alembic.md)
+下一章：[5.3 数据库迁移（Alembic）](03-数据库迁移Alembic.md)

@@ -1,0 +1,78 @@
+.playground {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.status {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--ifm-color-emphasis-600);
+}
+
+.status[data-status='running'] {
+  color: var(--ifm-color-primary);
+}
+
+.status[data-status='crashed'] {
+  color: var(--ifm-color-danger);
+}
+
+.editorWrap {
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.outputPanel {
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.outputTitle {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ifm-color-emphasis-700);
+  background: var(--ifm-color-emphasis-100);
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.output {
+  margin: 0;
+  padding: 0.75rem;
+  min-height: 6rem;
+  max-height: 30vh;
+  overflow: auto;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: var(--ifm-background-surface-color);
+  border-radius: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.outputPlaceholder {
+  color: var(--ifm-color-emphasis-500);
+}
+
+.stdout {
+  color: var(--ifm-font-color-base);
+}
+
+.stderr {
+  color: var(--ifm-color-danger);
+}
+
+.system {
+  color: var(--ifm-color-emphasis-500);
+  font-style: italic;
+}

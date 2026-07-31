@@ -10,11 +10,18 @@
 
 异步模式下，`await` 等待数据库时，事件循环可以去处理**其他请求**——单线程也能同时"照看"成百上千个连接。这对 IO 密集的 Web 后端收益巨大。
 
-```
-同步：请求A查库(等10ms) → 处理A → 请求B查库(等10ms) → 处理B
-异步：请求A查库(await) ┐
-      请求B查库(await) ├ 等待期间交替推进，总耗时大幅缩短
-      请求C查库(await) ┘
+```mermaid
+flowchart LR
+    subgraph sync["同步：串行干等"]
+        direction LR
+        a1["请求A查库（等10ms）"] --> a2[处理A] --> b1["请求B查库（等10ms）"] --> b2[处理B]
+    end
+    subgraph async["异步：await 等待期间交替推进，总耗时大幅缩短"]
+        c1["请求A查库(await)"]
+        c2["请求B查库(await)"]
+        c3["请求C查库(await)"]
+    end
+    sync ~~~ async
 ```
 
 ## 二、异步三件套：引擎、会话、驱动

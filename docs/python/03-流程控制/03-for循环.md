@@ -11,7 +11,7 @@ for 变量 in 一堆东西:
 
 最直观的例子——遍历字符串（把每个字符挨个拿出来）：
 
-```python
+```python live_py slim
 for ch in "Python":
     print(ch)
 ```
@@ -33,7 +33,7 @@ n
 
 想循环固定次数，配合 `range()` 使用：
 
-```python
+```python live_py slim
 # range(5) 生成 0, 1, 2, 3, 4（从 0 开始，不含 5）
 for i in range(5):
     print(f"第 {i} 次")
@@ -54,7 +54,7 @@ range(10, 0, -1)  # 10, 9, 8, ..., 1       （步长为负数就是倒着数）
 
 **累加 1 到 100**（对比上一节的 while 版本，简洁多了）：
 
-```python
+```python live_py title=累加1到100
 total = 0
 for i in range(1, 101):
     total += i
@@ -63,14 +63,14 @@ print(total)    # 5050
 
 **打印乘法表的一行**：
 
-```python
+```python live_py slim
 for i in range(1, 10):
     print(f"{i} × 5 = {i * 5}")
 ```
 
 **九九乘法表**（嵌套循环，外层每转一圈，内层转完一整轮）：
 
-```python
+```python live_py title=九九乘法表
 for i in range(1, 10):
     for j in range(1, i + 1):
         print(f"{j}×{i}={i*j}", end="\t")   # \t 是制表符，用于对齐
@@ -79,7 +79,7 @@ for i in range(1, 10):
 
 ## break 和 continue 同样适用
 
-```python
+```python live_py title=break演示
 for i in range(1, 10):
     if i == 5:
         break        # 遇到 5 就停，输出 1 2 3 4
@@ -141,4 +141,4 @@ for i in range(1, 6):
 - `range(开始, 结束, 步长)` 生成数字序列，含头不含尾
 - 已知次数用 for，未知次数用 while
 
-流程控制学完了！有了判断和循环，你已经能写出真正"有逻辑"的程序。下一章学习怎么存放一堆数据：[4.1 列表](../04-数据结构/01-列表.md)
+流程控制学完了！有了判断和循环，你已经能写出真正"有逻辑"的程序。下一章学习怎么存放一堆数据：[4.1 列表 list](../04-数据结构/01-列表.md)

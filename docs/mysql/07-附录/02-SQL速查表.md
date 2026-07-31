@@ -1,4 +1,4 @@
-# 附录二：SQL 速查表
+# 附录 B：SQL 速查表
 
 全书 SQL 命令一页汇总，按主题分区。忘了语法就来这里查，示例均基于全书统一的 `school` 库（class / student / course / score 四张表）。
 
@@ -182,7 +182,3 @@
 - 所有写操作（UPDATE / DELETE / DROP / TRUNCATE）动手前默念三遍：**有没有 WHERE？有没有备份？**
 - 判断 NULL 只能用 `IS NULL` / `IS NOT NULL`；聚合函数会自动忽略 NULL。
 - 建库建表统一 `utf8mb4`，中文、emoji 通吃，一劳永逸。
-
----
-
-[⬅ 上一节](01-常见错误与解决方案.md) | [🏠 返回目录](../README.md)

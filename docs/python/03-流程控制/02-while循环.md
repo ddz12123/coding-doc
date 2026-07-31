@@ -6,7 +6,7 @@
 
 `while` 的意思是：**只要条件成立，就一直重复执行缩进的代码**。
 
-```python
+```python live_py title=while基本结构
 count = 1
 
 while count <= 5:
@@ -71,7 +71,7 @@ while True:                      # 条件永远为真，故意的死循环
 
 ## continue：跳过本轮，进入下一轮
 
-```python
+```python live_py title=continue演示
 num = 0
 while num < 10:
     num += 1
@@ -85,7 +85,7 @@ while num < 10:
 
 ## 综合例子：累加 1 到 100
 
-```python
+```python live_py title=累加1到100
 total = 0
 num = 1
 

@@ -154,4 +154,4 @@ docker compose ls
 - `docker compose config` 是排查配置问题的利器
 - `down -v` 会删卷，敲之前想清楚
 
-到这里 Docker 和 Compose 的知识都齐了。接下来进入部署实战，把学到的东西用在真实项目上：[01-部署静态网站](../03-部署实战/01-部署静态网站.md)
+语法和命令都齐了，接下来动手做一个五服务的综合练习：[04-Compose全栈实战](04-Compose全栈实战.md)

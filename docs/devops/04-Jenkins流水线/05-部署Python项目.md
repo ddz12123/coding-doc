@@ -1,4 +1,4 @@
-# 实战：部署 Python 项目
+# 05 实战：部署 Python 项目
 
 后端项目和前端不同：产物不是静态文件，而是**要一直跑着的服务进程**，部署时必须让新代码替换旧进程。本篇以 FastAPI 项目为例，走**Docker 镜像**部署路线——Jenkins 构建镜像推到镜像仓库，服务器拉镜像重启容器。
 
@@ -12,14 +12,12 @@
 
 镜像方案把「代码 + 依赖 + 运行时」冻结成一个不可变的包：
 
-```text
-git push
-   │ Webhook
-   ▼
-Jenkins
-   ├── docker build 出镜像（含代码和全部依赖）
-   ├── docker push 到镜像仓库（版本号 = 构建号）
-   └── SSH 到服务器：docker compose pull && up -d
+```mermaid
+flowchart TD
+    push[git push] -->|Webhook| jenkins[Jenkins]
+    jenkins --> build["docker build 出镜像（含代码和全部依赖）"]
+    build --> reg["docker push 到镜像仓库（版本号 = 构建号）"]
+    reg --> deploy["SSH 到服务器：docker compose pull && up -d"]
 ```
 
 回滚 = 把版本号改回去重新 up，秒级完成。

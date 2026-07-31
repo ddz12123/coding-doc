@@ -1,0 +1,13 @@
+diff --git a/lib/index.js b/lib/index.js
+index e2800d612f22bcf2088bea4e1371ad6651f0692e..e79b48a7dc0f13f203cdfa1c04922c69d6d897ba 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -100,7 +100,7 @@ const theme = (context, options) => {
+         },
+         async contentLoaded({ content, actions }) {
+             const { setGlobalData } = actions;
+-            const libUrl = isRemote ? libDir : path.join(context.baseUrl, libDir, '/');
++            const libUrl = isRemote ? libDir : `${path.posix.join(context.baseUrl, libDir)}/`.replace(/\/+$/, '/');
+             setGlobalData({
+                 libDir: libUrl,
+                 syncMaxOnceEvery: options.syncMaxOnceEvery || DEFAULT_OPTIONS.syncMaxOnceEvery

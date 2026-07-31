@@ -3,11 +3,16 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# git 用于构建时读取文档的"最后更新时间"（showLastUpdateTime）
+RUN apk add --no-cache git
+
 # 安装 pnpm（与本地版本保持一致的大版本）
 RUN npm install -g pnpm@11
 
 # 先只复制依赖清单，充分利用 Docker 层缓存
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# 国内服务器构建加速：使用 npmmirror 镜像源
+RUN pnpm config set registry https://registry.npmmirror.com
 RUN pnpm install --frozen-lockfile
 
 # 复制其余源码并构建

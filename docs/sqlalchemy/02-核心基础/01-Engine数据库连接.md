@@ -71,12 +71,18 @@ engine = create_engine(
 
 Engine 内置了**连接池（Connection Pool）**：
 
-```
-                    ┌───────────── Engine ─────────────┐
-   session A ──借──→│  ┌────┐ ┌────┐ ┌────┐ ┌────┐     │
-   session B ──借──→│  │连接1│ │连接2│ │连接3│ │连接4│ ... │──→ 数据库
-   session C ──还──→│  └────┘ └────┘ └────┘ └────┘     │
-                    └──────────────────────────────────┘
+```mermaid
+flowchart LR
+    sa[session A] -->|借| pool
+    sb[session B] -->|借| pool
+    sc[session C] -->|还| pool
+    subgraph pool["Engine 连接池"]
+        c1[连接1]
+        c2[连接2]
+        c3[连接3]
+        c4[连接4]
+    end
+    pool --> db[(数据库)]
 ```
 
 - 连接用完不销毁，而是**归还池子**，下次直接复用
@@ -157,4 +163,4 @@ except Exception as e:
 | 原生 SQL | 用 `text()` 包裹 + 参数化，严禁 f-string 拼接 |
 | 惰性连接 | create_engine 不连库，首次执行 SQL 才连 |
 
-下一节，用类描述表结构 → [2.2 定义模型](02-定义模型.md)
+下一节，用类描述表结构 → [2.2 定义模型：把 Python 类变成数据表](02-定义模型.md)
