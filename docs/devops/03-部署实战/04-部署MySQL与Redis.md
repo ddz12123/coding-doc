@@ -170,4 +170,4 @@ docker run --rm -v myapp_redis-data:/data -v /backup:/backup alpine \
 - Redis 无密码 = 服务器送人，`requirepass` 必配
 - 备份要自动化（crontab + mysqldump），并且真的试过能恢复
 
-最后一篇把前面三篇串起来：[04-全栈项目部署](04-全栈项目部署.md)
+最后一篇把前面几篇串起来：[05-全栈项目部署](05-全栈项目部署.md)

@@ -173,4 +173,4 @@ docker compose exec api alembic upgrade head
 - 端口只绑 `127.0.0.1`，公网流量经 Nginx 反代
 - 加 `/health` 接口配合 healthcheck，`docker compose ps` 一眼看出服务是否健康
 
-下一篇解决数据层：[03-部署MySQL与Redis](03-部署MySQL与Redis.md)
+下一篇部署编译型语言的代表：[03-部署Go应用](03-部署Go应用.md)
