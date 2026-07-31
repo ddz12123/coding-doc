@@ -33,6 +33,11 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # edgeone.json 声明响应头（修正 .mjs/.wasm 的 MIME 类型），
+      # 同时放到仓库根和上传目录，兼容 CLI 的两种读取方式
+      - name: Copy edgeone.json into build
+        run: cp edgeone.json build/edgeone.json
+
       # 将构建产物 build 目录上传到 EdgeOne Pages（腾讯云边缘节点托管）
       # -n 对应 EdgeOne 控制台的 Pages 项目名，-t 为 API Token
       - name: Deploy to EdgeOne Pages

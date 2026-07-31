@@ -1,0 +1,22 @@
+{
+  "headers": [
+    {
+      "source": "/*.mjs",
+      "headers": [
+        {
+          "key": "content-type",
+          "value": "text/javascript;charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/*.wasm",
+      "headers": [
+        {
+          "key": "content-type",
+          "value": "application/wasm"
+        }
+      ]
+    }
+  ]
+}
