@@ -1,0 +1,58 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: # 支持在 Actions 页面手动触发
+
+# 同一时间只跑一条部署流水线，新提交会取消进行中的旧任务
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      # 清空旧产物（只删目录内容、保留 build 目录本身，
+      # 否则会破坏容器对该目录的 bind mount，需重启容器才能恢复）
+      - name: Clean old files on server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            mkdir -p /home/app/docs/build
+            find /home/app/docs/build -mindepth 1 -delete
+
+      # 上传整个 build 目录到 /home/app/docs 下（即 /home/app/docs/build）
+      # nginx 只读挂载该目录，上传完成即生效，无需重启容器
+      - name: Deploy to Server
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: 'build'
+          target: '/home/app/docs'
