@@ -23,7 +23,18 @@ try {
     $env:GOOS = ''
     $env:GOARCH = ''
 
-    # 2. Copy the official JS glue script. It MUST match the Go version
+    # 2. Gzip the wasm. EdgeOne Pages rejects single files over 25MiB,
+    #    so only main.wasm.gz is committed/deployed; go-worker.js
+    #    decompresses it in the browser via DecompressionStream.
+    $wasmPath = Join-Path $outDir 'main.wasm'
+    $gzPath = "$wasmPath.gz"
+    $in = [System.IO.File]::OpenRead($wasmPath)
+    $out = [System.IO.File]::Create($gzPath)
+    $gz = New-Object System.IO.Compression.GzipStream($out, [System.IO.Compression.CompressionLevel]::Optimal)
+    $in.CopyTo($gz)
+    $gz.Dispose(); $out.Dispose(); $in.Dispose()
+
+    # 3. Copy the official JS glue script. It MUST match the Go version
     #    used for compilation above.
     $goroot = go env GOROOT
     $glue = Join-Path $goroot 'lib\wasm\wasm_exec.js'      # Go 1.24+

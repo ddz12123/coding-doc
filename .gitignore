@@ -17,6 +17,10 @@ Thumbs.db
 .env.test.local
 .env.production.local
 
+# Go 演练场 WASM：仓库/部署只放 gzip 版（EdgeOne 单文件限 25MiB），
+# 原始 main.wasm 是本地编译产物（tools/go-playground/build.ps1 生成）
+static/go-wasm/main.wasm
+
 # IDE
 .idea
 .vscode

@@ -29,7 +29,8 @@ main.wasm (本目录 main.go 的编译产物，内嵌 Yaegi 解释器)
 
 | 产物 | 说明 |
 |---|---|
-| `static/go-wasm/main.wasm` | 编译产物（约 38MB，gzip 后约 9MB，nginx 已配置 `application/wasm` 压缩），**已提交 git**，跟随 `pnpm build` 进入构建产物、随整站部署 |
+| `static/go-wasm/main.wasm` | 编译产物（约 38MB），**仅存在于本地，不提交 git**（EdgeOne Pages 单文件限 25MiB） |
+| `static/go-wasm/main.wasm.gz` | 上面的 gzip 版（约 8MB），**已提交 git**、随整站部署；`go-worker.js` 在浏览器里用 `DecompressionStream` 解压后实例化 |
 | `static/go-wasm/wasm_exec.js` | Go 官方的 JS 胶水脚本，从 `$GOROOT/lib/wasm/` 拷贝，**必须与编译用的 Go 版本一致** |
 
 ## 什么时候需要重新编译？

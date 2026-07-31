@@ -21,15 +21,21 @@ self.__goReady = (version) => postMessage({type: 'ready', version});
 const go = new Go();
 (async () => {
   try {
-    const resp = await fetch('/go-wasm/main.wasm');
-    let result;
-    try {
-      result = await WebAssembly.instantiateStreaming(resp, go.importObject);
-    } catch (e) {
-      // 服务器 MIME 类型不对时流式实例化会失败，退回 ArrayBuffer 方式
-      const buf = await (await fetch('/go-wasm/main.wasm')).arrayBuffer();
-      result = await WebAssembly.instantiate(buf, go.importObject);
+    // EdgeOne Pages 限制单文件 25MiB，main.wasm（约 38MB）以 gzip 形式托管（约 8MB），
+    // 下载后用浏览器原生 DecompressionStream 解压
+    const resp = await fetch('/go-wasm/main.wasm.gz');
+    if (!resp.ok) {
+      throw new Error(`下载 main.wasm.gz 失败：HTTP ${resp.status}`);
     }
+    let buf = await resp.arrayBuffer();
+    // 若服务器按 Content-Encoding: gzip 返回并被浏览器自动解压，拿到的已是原始 wasm（魔数 \0asm）
+    const m = new Uint8Array(buf, 0, 4);
+    const isRawWasm = m[0] === 0x00 && m[1] === 0x61 && m[2] === 0x73 && m[3] === 0x6d;
+    if (!isRawWasm) {
+      const stream = new Response(buf).body.pipeThrough(new DecompressionStream('gzip'));
+      buf = await new Response(stream).arrayBuffer();
+    }
+    const result = await WebAssembly.instantiate(buf, go.importObject);
     // go.run 会一直阻塞（main.go 里 select{} 保活），不能 await
     go.run(result.instance);
   } catch (error) {
