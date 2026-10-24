@@ -139,11 +139,76 @@ OK
 
 **结论：需要打包多条命令时，实战中优先考虑 Lua 脚本。** 事务主要作为知识点了解（面试爱考"Redis 事务会回滚吗"）。
 
-## 6. 动手练习
+## 6. 小结
+
+本章命令一览：
+
+| 命令 | 作用 |
+|------|------|
+| `multi` | 开启事务，之后的命令只入队不执行（回显 `QUEUED`） |
+| `exec` | 一次性顺序执行队列里的所有命令，期间不被其他客户端插队 |
+| `discard` | 放弃事务，清空命令队列 |
+| `watch key` | 乐观锁：`exec` 前该 key 被别的客户端改过，事务自动取消（`exec` 返回 nil） |
+| `eval 脚本 numkeys key... arg...` | 原子执行 Lua 脚本，`KEYS[n]` 取 key、`ARGV[n]` 取参数 |
+
+一句话结论：**面试答"Redis 事务不回滚，只保证执行期间不被插队"；实战中要原子地打包'判断 + 操作'的逻辑，直接用 Lua 脚本。**
+
+## 7. 动手练习
 
 1. 用事务打包两条 `set`，正常执行一次
 2. 复现"运行时错误不回滚"：事务里放一条 `incr 一个字符串key`，观察其他命令照常生效
 3. 把库存扣减 Lua 脚本跑一遍，分别测试"库存够"和"库存不够"两种情况
+
+<details>
+<summary>参考答案</summary>
+
+第 1 题：
+
+```
+127.0.0.1:6379> multi
+OK
+127.0.0.1:6379(TX)> set k1 v1
+QUEUED
+127.0.0.1:6379(TX)> set k2 v2
+QUEUED
+127.0.0.1:6379(TX)> exec
+1) OK
+2) OK
+```
+
+第 2 题（关键点：`exec` 后第 2 条命令报错，但第 1、3 条照常生效，没有回滚）：
+
+```
+127.0.0.1:6379> set name hello       # 先造一个字符串 key
+OK
+127.0.0.1:6379> multi
+OK
+127.0.0.1:6379(TX)> set k1 v1
+QUEUED
+127.0.0.1:6379(TX)> incr name        # 对字符串 incr，入队不报错
+QUEUED
+127.0.0.1:6379(TX)> set k2 v2
+QUEUED
+127.0.0.1:6379(TX)> exec
+1) OK
+2) (error) ERR value is not an integer or out of range
+3) OK                              # k1、k2 都写成功了，name 没变
+```
+
+第 3 题（够就扣、不够返回 -1）：
+
+```
+127.0.0.1:6379> set stock 10
+OK
+127.0.0.1:6379> eval "local s = tonumber(redis.call('get', KEYS[1])) if s and s >= tonumber(ARGV[1]) then return redis.call('decrby', KEYS[1], ARGV[1]) else return -1 end" 1 stock 3
+(integer) 7                        # 库存 10 >= 3，扣成功，剩 7
+127.0.0.1:6379> eval "local s = tonumber(redis.call('get', KEYS[1])) if s and s >= tonumber(ARGV[1]) then return redis.call('decrby', KEYS[1], ARGV[1]) else return -1 end" 1 stock 100
+(integer) -1                       # 库存 7 < 100，拒绝扣减
+127.0.0.1:6379> get stock
+"7"                                # 两次失败后库存仍是 7
+```
+
+</details>
 
 ---
 

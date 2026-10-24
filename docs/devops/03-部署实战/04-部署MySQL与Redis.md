@@ -97,7 +97,7 @@ innodb_buffer_pool_size = 256M
 ### 2.4 Redis 的两个必配项
 
 - `--requirepass`：**必须设密码**。无密码的 Redis 暴露公网，几小时内就会被写入挖矿任务（真实高发事故）
-- `--appendonly yes`：开启 AOF 持久化，重启不丢数据
+- `--appendonly yes`：开启 AOF 持久化，重启不丢数据。AOF（Append Only File）的原理是把**每条写命令**追加记录到一个文件里，Redis 重启时重放这些命令恢复数据；默认的 RDB 是定时快照，两次快照之间的写入宕机就丢了，AOF 最多丢约 1 秒
 
 ## 3. 启动与验证
 
@@ -115,6 +115,19 @@ docker compose exec redis redis-cli -a "你的密码" ping
 # 返回 PONG
 ```
 
+MySQL 那条命令会先提示 `Enter password:`（输入 `bloguser` 的密码），初始化脚本正常执行的话输出长这样：
+
+```text
++----------------+
+| Tables_in_blog |
++----------------+
+| posts          |
+| users          |
++----------------+
+```
+
+（表名取决于 `mysql/init/01-schema.sql` 里建了什么表；一个表都没建则显示 `Empty set`。）
+
 应用容器（同一个 compose 项目里）的连接串：
 
 ```text
@@ -131,19 +144,23 @@ redis://:密码@redis:6379/0
 ### 4.1 MySQL 备份
 
 ```bash
-# 导出整库（在宿主机执行）
-docker compose exec mysql mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" blog > backup_$(date +%F).sql
+# 导出整库（宿主机手动执行：-p 后不接密码，回车后交互输入）
+docker compose exec mysql mysqldump -uroot -p blog > backup_$(date +%F).sql
 
-# 恢复
-docker compose exec -T mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" blog < backup_2026-07-31.sql
+# 恢复（从文件管道喂 SQL 必须加 -T：关闭 TTY 分配，否则输入流进不去容器）
+docker compose exec -T mysql mysql -uroot -p blog < backup_2026-07-31.sql
 ```
 
-配合 crontab 每天凌晨自动备份：
+> 为什么不写 `-p"$MYSQL_ROOT_PASSWORD"`？这个变量只存在于 `.env` 文件里，Compose 会读它，但宿主机 shell 并没有导出这个变量——命令里引用到的是**空字符串**，密码为空直接被拒。手动操作就用上面的交互式 `-p`；脚本里确实要引用变量的话，先导出再执行：`set -a && source .env && set +a`。
+
+配合 crontab 每天凌晨自动备份（cron 无人值守没法交互输密码，统一用 source .env 的写法）：
 
 ```bash
 # crontab -e 添加：
-0 3 * * * cd /srv/myapp && docker compose exec -T mysql mysqldump -uroot -p密码 blog | gzip > /backup/blog_$(date +\%F).sql.gz
+0 3 * * * cd /srv/myapp && set -a && . ./.env && set +a && docker compose exec -T mysql mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" blog | gzip > /backup/blog_$(date +\%F).sql.gz
 ```
+
+> crontab 里 `-T` 同样必带：cron 环境没有终端，不关 TTY 分配会报 `the input device is not a TTY`。密码绝不能明文写进 crontab（`crontab -l` 谁都能看），一律从 `.env` 引用。
 
 ### 4.2 Redis 备份
 
@@ -154,6 +171,13 @@ docker run --rm -v myapp_redis-data:/data -v /backup:/backup alpine \
   tar czf /backup/redis_$(date +%F).tar.gz -C /data .
 ```
 
+> 注意 `myapp_redis-data` 别照抄：**命名卷的实际全名 = compose 项目名（默认是 compose.yaml 所在目录名）+ 下划线 + 卷名**。先确认你机器上的真实卷名再替换：
+>
+> ```text
+> $ docker volume ls | grep redis
+> local     myapp_redis-data
+> ```
+
 ## 5. 安全清单
 
 - [ ] 端口绑定 `127.0.0.1`，或干脆不映射端口（应用在容器网络里直接访问）
@@ -162,6 +186,34 @@ docker run --rm -v myapp_redis-data:/data -v /backup:/backup alpine \
 - [ ] 应用使用业务账号连 MySQL，不用 root
 - [ ] 自动备份 + 定期验证备份能恢复
 - [ ] 升级镜像版本前先备份（`docker compose pull` 之前）
+
+## 动手练习
+
+亲自踩一遍「首次初始化」这个高频坑，再学会正确的改密方式：
+
+1. 正常启动后，`vim .env` 把 `MYSQL_ROOT_PASSWORD` 改成一个新密码，`docker compose up -d` 重启 MySQL
+2. 用**新密码**登录：`docker compose exec mysql mysql -uroot -p`——观察报什么错
+3. 用**旧密码**再登录一次——居然能进去，说明环境变量并没有改掉已有密码
+4. 思考：想真正换密码应该怎么做？
+
+<details><summary>参考答案</summary>
+
+第 2 步会报 `ERROR 1045 (28000): Access denied for user 'root'@'localhost' (using password: YES)`；第 3 步旧密码直接登进去——`MYSQL_ROOT_PASSWORD` 只在**数据卷为空的首次启动**时生效，之后改它再重启，MySQL 里的真实密码纹丝不动。
+
+正确改密用 SQL（先拿旧密码登进去）：
+
+```bash
+docker compose exec mysql mysql -uroot -p    # 输旧密码
+```
+
+```sql
+ALTER USER 'root'@'%' IDENTIFIED BY '新密码';
+FLUSH PRIVILEGES;
+```
+
+改完后把 `.env` 里的 `MYSQL_ROOT_PASSWORD` 同步成新密码：这个变量虽然不再影响已初始化的库，但备份脚本和文档还要靠它跟「真实状态」保持一致。
+
+</details>
 
 ## 小结
 

@@ -157,4 +157,26 @@ Go 编译器会自动处理，行尾不用写 `;`。
 2. 故意把 `import "fmt"` 里的 fmt 用不上（把两行 Println 删掉），运行 `go run main.go`，观察报错信息长什么样。
 3. 用 `go build` 编译出可执行文件，然后把它拷贝到别的目录运行，验证它是独立可执行的。
 
+<details>
+<summary>点击查看练习 2 答案</summary>
+
+fmt 没用上时，`go run main.go` 直接编译失败，真实报错（Go 1.21+）：
+
+```text
+./main.go:3:2: "fmt" imported and not used
+```
+
+（Go 1.20 及更早版本的文案是 `imported and not used: "fmt"`，一个意思。）
+
+人话翻译：你导入了 fmt，但代码里压根没用它。注意这是**编译错误**不是警告——程序根本跑不起来，不存在"先跑起来再说"。解决：要么删掉这行 import，要么真的用上 `fmt`。
+
+</details>
+
+## 本节小结
+
+- `go mod init 项目名` 是每个 Go 项目的第一步，它生成记录模块信息的 `go.mod`
+- `go run` 开发调试用（编译完立刻运行），`go build` 交付用（生成可独立运行的可执行文件）
+- `package main` + `func main()` 是程序入口，一个可执行程序必须有且只有一个
+- "导入了没用、声明了没用"在别的语言顶多是警告，在 Go 是**编译错误**——代码干净是被强制的
+
 下一节：[1.4 Go 命令与模块初识](04-go-toolchain.md)

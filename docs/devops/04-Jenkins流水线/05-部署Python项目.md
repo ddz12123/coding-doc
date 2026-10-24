@@ -173,6 +173,52 @@ stage('部署') {
 
 简单粗暴，但构建吃的是**生产服务器**的 CPU/内存，项目大了会影响线上服务——所以它只适合小项目，团队项目老老实实走镜像仓库。
 
+## 7. 高频坑：docker build 报 daemon socket 权限错误
+
+流水线在「构建镜像」阶段挂掉，控制台报：
+
+```text
+permission denied while trying to connect to the Docker daemon socket
+at unix:///var/run/docker.sock: ... dial unix /var/run/docker.sock: connect: permission denied
+```
+
+**原因**：容器里的 jenkins 用户（默认 uid 1000）访问不了宿主机的 `/var/run/docker.sock`（属主 root、权限 660）。`docker build` 实际是连这个 socket 指挥宿主机 Docker，没权限自然被拒。
+
+解法（按推荐顺序）：
+
+1. 确认 Jenkins 的 compose.yaml 里写了 `user: root`（[02-安装Jenkins](02-安装Jenkins.md) 的配置本来就带），然后 `docker compose up -d` 重建容器
+2. 更收敛的做法：不用 root，改挂组——把宿主机 docker 组的 gid（`getent group docker | cut -d: -f3` 查）通过 `group_add` 传给容器，让 jenkins 用户以 docker 组身份访问 socket
+3. `chmod 666 /var/run/docker.sock` 能临时救急，但宿主机重启就失效，且等于把 Docker 开放给本机所有用户，不推荐
+
+修好后在 Jenkins 容器里验证：
+
+```bash
+docker exec jenkins docker version   # Client 和 Server 信息都打印出来才算通
+```
+
+## 动手练习
+
+手动演练一次回滚（别等线上出事故才第一次操作）：
+
+1. 给应用加一个版本接口（如 `GET /version` 返回当前构建号），连续 push 两次让流水线产出 build-10、build-11 两个版本，在服务器上 `curl http://127.0.0.1:8000/version` 确认线上是 build-11
+2. 在服务器上把 `compose.yaml` 里的 `:latest` 改成 `:build-10`，`docker compose up -d`
+3. 再 curl 一次版本接口，确认线上退回了 build-10
+4. 把 tag 改回 `:latest`，`up -d` 恢复
+
+<details><summary>参考答案</summary>
+
+```bash
+cd /opt/fastapi-app
+vim compose.yaml        # fastapi-app:latest → fastapi-app:build-10
+docker compose up -d    # 输出显示 Container fastapi-app  Recreated
+curl http://127.0.0.1:8000/version   # {"version":"build-10"}，回滚完成
+```
+
+- `up -d` 看到 `Recreated` 是正常的：镜像 tag 变了，Compose 会自动重建容器，秒级完成
+- 回滚能成立的前提是**历史版本的镜像还躺在镜像仓库里**。流水线只 push 从不删仓库镜像，每个 build 号都是一份可随时取用的存档——这就是「镜像仓库 = 回滚保险库」的意义
+
+</details>
+
 ## 小结
 
 - 后端部署走镜像三部曲：**build → push → 服务器 pull + up**

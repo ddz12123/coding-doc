@@ -205,6 +205,7 @@ func main() {
 打开的文件要关、加的锁要解、连接要断。这些收尾动作写在函数结尾的话，**中途任何一个 return 都会跳过它们**。defer 让你"打开"和"关闭"写在相邻两行，之后无论函数从哪条路 return，收尾都保证执行：
 
 ```go
+// 需要 import "os"
 func readFile() error {
     f, err := os.Open("data.txt")
     if err != nil {

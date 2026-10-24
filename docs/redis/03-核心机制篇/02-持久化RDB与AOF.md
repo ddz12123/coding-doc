@@ -134,6 +134,36 @@ redis-cli get important-data        # 数据还在！
 
 再对比：如果 RDB 和 AOF 都关掉，重启后数据就没了。
 
+还不够过瘾？再来一个实验：**亲眼看到 AOF 的"流水账"长什么样**。为了结果干净，新起一个开了 AOF 的容器（端口换 6380 避免和 my-redis 冲突；非 Docker 用户在配置文件写上 `appendonly yes` 后重启即可）：
+
+```bash
+docker run -d --name redis-aof -p 6380:6379 redis:7 --appendonly yes
+docker exec redis-aof redis-cli set foo bar
+# AOF 默认每秒刷盘，如果 cat 暂时没内容，等 1 秒再看
+docker exec redis-aof cat /data/appendonlydir/appendonly.aof.1.incr.aof
+```
+
+输出：
+
+```
+*2
+$6
+SELECT
+$1
+0
+*3
+$3
+set
+$3
+foo
+$3
+bar
+```
+
+这就是你那条 `set foo bar` 在文件里的**协议原文**（RESP 协议）：`*2`、`*3` 表示这条命令由几个部分组成，`$6`、`$3` 表示紧随其后的字符串有几个字节。开头的 `SELECT 0` 是 Redis 自动记录的"切换到 0 号库"，之后你写的每一条命令都会这样一条条追加进来——**"流水账"的实体就是它**。重启时把这些命令从头到尾重放一遍，数据就回来了。
+
+> 💡 注意：Redis 7 起 AOF 不再是单个文件，而是 `appendonlydir/` 目录下的一组文件——`appendonly.aof.1.incr.aof` 是增量命令日志（刚才看的就是它），`appendonly.aof.1.base.rdb` 是重写时生成的全量底稿（混合持久化）。实验完记得清理：`docker rm -f redis-aof`。
+
 ## 7. 小结（面试速答版）
 
 - **RDB**：定时全量快照，恢复快、文件小，但两次快照间的数据会丢；`bgsave` 通过 fork 子进程避免阻塞

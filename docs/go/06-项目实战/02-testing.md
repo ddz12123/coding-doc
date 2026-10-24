@@ -186,12 +186,16 @@ func ExampleAdd() {
 
 ---
 
-## 新手常见坑
+## 新手常见坑（静默不运行速查表）
 
-1. **测试文件名不带 `_test.go`** → go test 根本不认
-2. **测试函数名 `Test` 后面跟小写字母**（如 `Testadd`）→ 不会被执行！必须 `TestAdd`
-3. **只测"正常路径"**：边界（0、负数、空字符串、空切片）和错误路径才是 bug 高发区
-4. **测试互相依赖执行顺序**：每个测试必须独立可运行
+这节的坑最阴险的地方是**不报错**——测试悄悄没跑，你还以为全绿：
+
+| 现象 | 原因 | 解决 |
+|------|------|------|
+| `go test` 显示 `?   myapp/calc [no test files]` | 测试文件名不是 `_test.go` 结尾，go test 根本不认 | 文件名改成 `xxx_test.go`，和被测代码放同一目录 |
+| 输出 `testing: warning: no tests to run`，秒过 | 测试函数 `Test` 后面跟了小写字母（如 `Testadd`），不算测试函数 | 必须写成 `TestXxx`（X 大写）；用 `go test -v` 能看清到底跑了谁 |
+| 测试全绿，bug 还是上线了 | 只测了正常路径 | 边界（0、负数、空字符串、空切片）和错误路径才是 bug 高发区，用表驱动列全 |
+| 两次运行结果时好时坏 | 测试之间共享状态、依赖执行顺序 | 每个测试独立：自己准备数据、自己清理，不碰共享变量 |
 
 ---
 
@@ -200,5 +204,92 @@ func ExampleAdd() {
 1. 给你在上一节写的 `geometry` 包补上表驱动测试，覆盖正常值、零值、负数（负数宽高应该怎么处理？先想清楚行为，再写测试和实现）。
 2. 写函数 `IsPalindrome(s string) bool` 判断回文串，先写测试用例（"aba"、""、"ab"、"中文文中"），再写实现，体验"测试先行"。
 3. 用 `go test -cover` 看看你的测试覆盖率是多少。
+
+<details>
+<summary>点击查看答案</summary>
+
+**1. 先做决策：负数/零宽高不是合法矩形，返回 error**——而不是悄悄返回 0，调用方得能区分"面积恰好为 0"和"参数非法"：
+
+```go
+// geometry/rect.go
+package geometry
+
+import "fmt"
+
+func RectArea(w, h float64) (float64, error) {
+    if w <= 0 || h <= 0 {
+        return 0, fmt.Errorf("宽高必须为正数，得到 %v 和 %v", w, h)
+    }
+    return w * h, nil
+}
+```
+
+表驱动用例（正常、零、负、错误路径全占）：
+
+```go
+func TestRectArea(t *testing.T) {
+    tests := []struct {
+        name    string
+        w, h    float64
+        want    float64
+        wantErr bool
+    }{
+        {"正常", 3, 4, 12, false},
+        {"宽为零", 0, 4, 0, true},
+        {"高为负", 3, -1, 0, true},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got, err := RectArea(tt.w, tt.h)
+            if (err != nil) != tt.wantErr {
+                t.Fatalf("err = %v, wantErr = %v", err, tt.wantErr)
+            }
+            if !tt.wantErr && got != tt.want {
+                t.Errorf("RectArea(%v, %v) = %v，期望 %v", tt.w, tt.h, got, tt.want)
+            }
+        })
+    }
+}
+```
+
+**2. 双指针实现要点**：一头一尾两个下标往中间走，不相等就 false，碰头就是回文。**坑：字符串下标取的是字节**（2.2 节讲过），中文必须先转 `[]rune` 再比：
+
+```go
+func IsPalindrome(s string) bool {
+    r := []rune(s)
+    for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
+        if r[i] != r[j] {
+            return false
+        }
+    }
+    return true
+}
+```
+
+空串边界：`len("")-1 = -1`，循环一次都不跑，直接返回 true——**空串算回文**。先在用例表里写 `{"", true}` 把这个行为钉死：
+
+```go
+tests := []struct {
+    in   string
+    want bool
+}{
+    {"aba", true},
+    {"", true},          // 边界：空串视为回文，用测试钉死
+    {"ab", false},
+    {"中文文中", true},
+}
+```
+
+**3.** `go test -cover` 会输出类似 `coverage: 78.6% of statements`。它只统计语句覆盖，别追求 100%，把心思花在**分支和边界**上。
+
+</details>
+
+## 本节小结
+
+- 测试零配置：`xxx_test.go` 文件 + `TestXxx(t *testing.T)` 函数 + `go test`，标准库全搞定
+- 表驱动是 Go 招牌：用例进表格、`t.Run` 子测试独立报告，加用例只加一行
+- `t.Errorf` 记错继续跑、`t.Fatalf` 记错立刻停；边界和错误路径才是 bug 高发区
+- 静默不运行的两大元凶：文件名不带 `_test.go`、`Test` 后跟小写字母——怀疑时用 `go test -v` 验明正身
 
 下一节：[6.3 常用标准库速览](03-stdlib.md)

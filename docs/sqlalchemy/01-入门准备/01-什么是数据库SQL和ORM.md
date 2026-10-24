@@ -1,6 +1,6 @@
 # 1.1 什么是数据库、SQL 和 ORM
 
-> 本节没有任何代码，但它回答了三个最重要的问题：**数据存在哪？怎么存取？SQLAlchemy 是干什么的？**
+> 本节没有需要动手运行的代码，但它回答了三个最重要的问题：**数据存在哪？怎么存取？SQLAlchemy 是干什么的？**
 > 搞懂这三个问题，后面的学习会顺利十倍。
 
 ## 一、程序的数据存在哪里？
@@ -166,6 +166,101 @@ flowchart LR
 ```
 
 第 6、7 章我们会完整实现这条链路。
+
+## 七、练习（概念自测）
+
+### 练习 1：找痛点
+
+下面的代码用 Python 自带的 sqlite3 模块查询用户表：
+
+```python
+cursor.execute("SELECT id, name, email, age FROM users")
+rows = cursor.fetchall()
+name = rows[0][1]   # 想取"第一个用户的名字"
+```
+
+请指出这段代码体现的两个痛点（提示：想想 `rows[0][1]` 里的 `[1]` 是怎么来的）。
+
+<details><summary>参考答案</summary>
+
+两个典型痛点（任答两个即可）：
+
+1. **结果是元组，靠下标取列**——`rows[0][1]` 里的 `[1]` 表示"name 是第 2 列"。你必须人工记住列的顺序，一旦表结构变化（比如在前面加了一列），代码不报错但会**悄悄取错值**。
+2. **SQL 是纯字符串**——列名写错、语法写错，IDE 和 Python 都不会提示，直到运行时才炸。
+3. （加分项）**手拼 SQL 有注入风险**、**换数据库要改方言**。
+
+完整可运行验证：
+
+```python
+import sqlite3
+
+conn = sqlite3.connect(":memory:")
+cursor = conn.cursor()
+cursor.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT, age INTEGER)")
+cursor.execute("INSERT INTO users (name, email, age) VALUES ('张三', 'zhangsan@qq.com', 25)")
+conn.commit()
+
+cursor.execute("SELECT id, name, email, age FROM users")
+rows = cursor.fetchall()
+print(rows)         # [(1, '张三', 'zhangsan@qq.com', 25)] —— 一堆元组
+print(rows[0][1])   # 张三 —— 靠下标"背"出来的名字
+```
+
+预期输出：
+
+```
+[(1, '张三', 'zhangsan@qq.com', 25)]
+张三
+```
+
+对比 ORM 的写法 `users[0].name`——直接用属性名，列一变 IDE 立刻标红。
+
+</details>
+
+### 练习 2：主键还是外键？
+
+电商数据库中有两张表：`users`（用户表）和 `order_items`（订单明细表）。`order_items` 表里有一列 `user_id`，存放的是下单用户的 id。
+
+问：`user_id` 是 `order_items` 表的**主键**还是**外键**？为什么？
+
+<details><summary>参考答案</summary>
+
+**外键。**
+
+- 主键是"唯一标识**本表**一行"的字段——`order_items` 自己的主键是自增的 `id`。
+- `user_id` 存的是**另一张表（users）主键的值**，用来表达"这条订单明细属于哪个用户"，这正是外键的定义（第 4 章会专门讲怎么在 SQLAlchemy 里声明它）。
+
+| 表 | 字段 | 身份 |
+|----|------|------|
+| users | id | users 的主键 |
+| order_items | id | order_items 的主键 |
+| order_items | user_id | 指向 users.id 的**外键** |
+
+</details>
+
+### 练习 3：CRUD 连线
+
+把左边的操作与右边的 SQL 语句一一对应（候选：`SELECT` / `INSERT` / `UPDATE` / `DELETE`）：
+
+| 操作 | SQL |
+|------|-----|
+| Create（增） | ? |
+| Read（查） | ? |
+| Update（改） | ? |
+| Delete（删） | ? |
+
+<details><summary>参考答案</summary>
+
+| 操作 | SQL |
+|------|-----|
+| Create（增） | `INSERT` |
+| Read（查） | `SELECT` |
+| Update（改） | `UPDATE` |
+| Delete（删） | `DELETE` |
+
+对照第三节的四个 SQL 例子逐个验证：`INSERT INTO` 新增一行、`SELECT` 查询、`UPDATE ... SET` 修改、`DELETE` 删除。日常后端开发 80% 的数据库工作就是这四件事。
+
+</details>
 
 ## 📝 本节小结
 

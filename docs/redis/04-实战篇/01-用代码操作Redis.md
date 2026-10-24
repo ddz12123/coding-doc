@@ -162,7 +162,19 @@ public class DemoService {
 3. **存中文乱码 / 拿到 bytes**：Python 记得 `decode_responses=True`
 4. **本地能连服务器连不上**：检查 Redis 的 `bind` 配置、防火墙、密码，以及云服务器安全组
 
-## 5. 动手练习
+## 5. 小结：三语言客户端对照表
+
+| | Python | Node.js | Java（Spring Boot） |
+|------|---------|---------|--------------------|
+| 客户端库 | `redis`（redis-py） | `ioredis`（或官方 `redis`） | `spring-boot-starter-data-redis` |
+| 创建连接 | `redis.Redis(host, port, decode_responses=True)` | `new Redis({ host, port })` | 注入 `StringRedisTemplate`（配置写在 yml） |
+| set 命令写法 | `r.set("k", "v", ex=60)` | `await redis.set("k", "v", "EX", 60)` | `redis.opsForValue().set("k", "v", Duration.ofSeconds(60))` |
+| 其他命令对应 | 方法名 = 命令名（`hset`、`zadd`） | 方法名 = 命令名（`hset`、`zadd`） | 按类型分组（`opsForHash()`、`opsForZSet()`） |
+| 注意事项 | 记得 `decode_responses=True`，否则拿到 bytes | 所有方法返回 Promise，记得 `await` | 存对象用 JSON 字符串，别用 JDK 序列化 |
+
+规律就一条：**方法名 ≈ 命令名**，命令行学的所有东西都能直接迁移到任何语言。
+
+## 6. 动手练习
 
 用你熟悉的语言实现一个"文章阅读量"小功能：
 

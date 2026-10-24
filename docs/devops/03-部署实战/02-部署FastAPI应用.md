@@ -129,9 +129,19 @@ docker compose logs -f api        # 看启动日志
 curl http://127.0.0.1:8000/health # {"status":"ok"}
 ```
 
+`docker compose logs -f api` 的启动日志长这样，看到 `Uvicorn running on` 那行就是启动成功：
+
+```text
+myapi-api-1  | INFO:     Will watch for changes in these directories: ['/app']
+myapi-api-1  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+myapi-api-1  | INFO:     Started server process [1]
+myapi-api-1  | INFO:     Waiting for application startup.
+myapi-api-1  | INFO:     Application startup complete.
+```
+
 ## 7. 前面挡一层 Nginx（推荐）
 
-后端一般不直接裸奔在公网，前面放 Nginx 做反向代理，好处：HTTPS 证书、限流、静态文件、多应用共用 80 端口。
+后端一般不直接裸奔在公网，前面放 Nginx 做反向代理（Reverse Proxy）。打个比方：反向代理就像**公司总机**——外面的人只拨一个总机号码，总机再把电话转给对应的分机。客户端只访问 Nginx 一个入口，Nginx 再把请求转给藏在后面的后端服务。这样做的好处：HTTPS 证书、限流、静态文件、多应用共用 80 端口。
 
 宿主机 Nginx 的配置示例（Nginx 也可以容器化，见第 04 篇全栈部署）：
 
@@ -165,6 +175,30 @@ docker compose logs -f api    # 盯一眼启动日志确认没报错
 ```bash
 docker compose exec api alembic upgrade head
 ```
+
+## 动手练习
+
+体会「只绑 127.0.0.1」到底挡住了谁：
+
+1. 把 compose.yaml 里 api 的端口映射临时改成 `"8000:8000"`（不写 IP 前缀 = 监听所有网卡），`docker compose up -d` 重建
+2. 在**服务器上**执行 `curl http://127.0.0.1:8000/health`，再在**自己电脑上**执行 `curl http://服务器IP:8000/health`——两边都通
+3. 改回 `"127.0.0.1:8000:8000"` 重建，重复第 2 步：服务器上仍然通，自己电脑上超时或连接被拒绝
+4. 在服务器上执行 `ss -tlnp | grep 8000`，对比两种写法的监听地址有什么不同
+
+<details><summary>参考答案</summary>
+
+第 4 步的对比：
+
+```text
+"8000:8000"            → tcp  LISTEN  0.0.0.0:8000   # 监听所有网卡，公网可达
+"127.0.0.1:8000:8000"  → tcp  LISTEN  127.0.0.1:8000 # 只监听本机回环，外部到不了
+```
+
+原因：端口映射写不写 IP 前缀，决定 Docker 把端口绑在哪块网卡上。`127.0.0.1` 是本机回环地址，只有服务器自己连得上，外部无论怎么 curl 都到不了——所以第 3 步在自己电脑上必然失败。
+
+这正是第 7 节「Nginx 挡在前面」的前提：后端只绑本机，公网流量统一从 Nginx 的 80/443 进来，暴露面最小。
+
+</details>
 
 ## 小结
 

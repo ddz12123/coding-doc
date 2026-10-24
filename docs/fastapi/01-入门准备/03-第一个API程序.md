@@ -118,11 +118,7 @@ def create_user():
 
 保存文件后服务会自动重启（开发模式的好处）。刷新 `/docs`，四个接口都出现了。
 
-试着思考：
-
-- `GET /users` 和 `POST /users` 路径相同但方法不同，是**两个不同的接口**
-- 函数返回列表、字典、字符串、数字都可以，FastAPI 都能转成 JSON
-- 函数的**文档字符串**（三引号注释）会显示在 `/docs` 里，养成写注释的习惯
+本节涉及的三个思考点——「同路径不同方法是不是同一个接口」「函数能返回哪些类型」「三引号注释有什么用」——已经整理成本章第 8 节的练习 1，先自己想想，再展开答案对照。
 
 ## 6. 给文档加点信息（可选）
 
@@ -155,6 +151,85 @@ fastapi dev main.py --host 0.0.0.0
 ```
 
 然后用你电脑的局域网 IP（如 `192.168.1.100:8000`）访问。
+
+## 8. 练习
+
+### 练习 1（思考题）：三个小判断
+
+判断下面三个说法是否正确：
+
+1. `GET /users` 和 `POST /users` 路径相同，所以它们是同一个接口
+2. 接口函数只能返回字典，返回别的类型会报错
+3. 函数里用三引号写的说明文字只是给自己看的，没有别的作用
+
+<details>
+<summary>参考答案</summary>
+
+1. **错**。路径 + 方法一起才能确定一个接口。`GET /users` 是查询用户列表，`POST /users` 是创建用户，是**两个不同的接口**，可以同时存在。
+2. **错**。列表、字典、字符串、数字都可以返回，FastAPI 会自动转成 JSON：列表 → JSON 数组，字典 → JSON 对象，数字 → JSON 数字。
+3. **错**。函数的**文档字符串**会显示在 `/docs` 的接口说明里，是自动文档的一部分，养成写注释的习惯，文档会越写越详细。
+
+</details>
+
+### 练习 2（动手题）：写一个 /about 接口
+
+新增一个 `GET /about` 接口，返回一段介绍你自己的 JSON（包含姓名、爱好等字段，内容随意）。写完后分别在浏览器地址栏和 `/docs` 里各访问一次。
+
+<details>
+<summary>参考答案</summary>
+
+在 `main.py` 里追加：
+
+```python
+@app.get("/about")
+def about():
+    """自我介绍"""
+    return {
+        "name": "小明",
+        "hobby": ["编程", "篮球"],
+        "learning": "FastAPI",
+    }
+```
+
+浏览器访问 http://127.0.0.1:8000/about ，响应：
+
+```json
+{"name": "小明", "hobby": ["编程", "篮球"], "learning": "FastAPI"}
+```
+
+在 `/docs` 里则要点击接口 → `Try it out` → `Execute`，能在下方看到同样的响应——两种方式发的是同一个 GET 请求。
+
+</details>
+
+### 练习 3（动手题）：给用户加 email 字段
+
+修改 `GET /users`，让返回的每个用户对象多一个 `email` 字段。改完刷新浏览器验证。
+
+<details>
+<summary>参考答案</summary>
+
+```python
+@app.get("/users")
+def list_users():
+    # 先用写死的假数据模拟，学了数据库后换成真数据
+    return [
+        {"id": 1, "name": "小明", "email": "xiaoming@example.com"},
+        {"id": 2, "name": "小红", "email": "xiaohong@example.com"},
+    ]
+```
+
+访问 http://127.0.0.1:8000/users ，响应：
+
+```json
+[
+  {"id": 1, "name": "小明", "email": "xiaoming@example.com"},
+  {"id": 2, "name": "小红", "email": "xiaohong@example.com"}
+]
+```
+
+这个小改动说明：接口返回什么结构，完全由你 return 的数据决定，改起来非常直接。
+
+</details>
 
 ## 本章小结
 

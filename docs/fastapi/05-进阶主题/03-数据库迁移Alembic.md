@@ -92,7 +92,27 @@ def downgrade() -> None:
 - `upgrade()`：本次变更做什么
 - `downgrade()`：如何撤销本次变更
 
-检查无误后 `alembic upgrade head`，用 DB Browser 确认 users 表多了 phone 列，**已有数据完好无损**。
+检查无误后执行第 3 步，终端输出长这样：
+
+```bash
+$ alembic upgrade head
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> a1b2c3d4e5f6, add phone to users
+```
+
+最后一行是关键：从当前版本升到 `a1b2c3d4e5f6`——箭头左边为空，说明迁移前数据库还处于「空基线」（首次迁移前什么版本都不是）；`a1b2c3d4e5f6` 正是 versions/ 下那个脚本文件名的前缀。
+
+再用 `alembic current` 复查数据库现在停在哪个版本：
+
+```bash
+$ alembic current
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+a1b2c3d4e5f6 (head)
+```
+
+`a1b2c3d4e5f6 (head)` 表示数据库已应用到版本链的最顶端。最后用 DB Browser 打开 blog.db，确认 users 表多了 phone 列，**已有数据完好无损**。
 
 ### 为什么第 2 步必须人工检查？
 
@@ -134,6 +154,88 @@ fastapi run app/main.py
 - 迁移脚本（versions/ 目录）**必须提交到 git**——它是表结构的变更历史
 - 拉取同事代码后，先 `alembic upgrade head` 同步本地库再开发
 - 两人同时生成迁移可能产生分叉，Alembic 会报「Multiple heads」，用 `alembic merge heads` 合并（遇到再查即可）
+
+## 8. 练习
+
+### 练习 1：给 posts 加浏览量计数字段（完整走一遍三步）
+
+给 Post 模型加一个 `views` 浏览计数字段，走完「生成 → 检查 → 升级」三步，并验证已有的文章数据一条不丢。提示：计数列通常是 NOT NULL 且默认 0，注意第 2 步要重点检查什么。
+
+<details><summary>参考答案</summary>
+
+第 1 步，改模型并生成迁移：
+
+```python
+# app/models.py 的 Post 类中添加
+views: Mapped[int] = mapped_column(default=0, nullable=False)
+```
+
+```bash
+$ alembic revision --autogenerate -m "add views to posts"
+```
+
+第 2 步，打开生成的脚本检查，会看到：
+
+```python
+def upgrade() -> None:
+    op.add_column("posts", sa.Column("views", sa.Integer(), nullable=False))
+```
+
+**发现了吗——直接执行会出事。** 如果 posts 表里已有文章，`alembic upgrade head` 会报错：
+
+```
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError)
+Cannot add a NOT NULL column with default value NULL
+```
+
+这正是第 4 节强调「必须人工检查」的活例子：模型里的 `default=0` 只在 Python 层对新 insert 生效，数据库不知道；往已有多行的表里加 NOT NULL 列，数据库要求给旧行一个填法。手改脚本补上 `server_default`：
+
+```python
+def upgrade() -> None:
+    # server_default="0"：告诉数据库「已有行的这一列都填 0」
+    op.add_column("posts", sa.Column("views", sa.Integer(), nullable=False, server_default="0"))
+
+
+def downgrade() -> None:
+    op.drop_column("posts", "views")
+```
+
+第 3 步，执行并验证：
+
+```bash
+$ alembic upgrade head
+INFO  [alembic.runtime.migration] Running upgrade a1b2c3d4e5f6 -> f6e5d4c3b2a1, add views to posts
+```
+
+用 DB Browser 查看：posts 表多了 views 列，所有旧文章的 views 都是 0，标题、正文原样都在——数据零丢失。以后在阅读文章的接口里 `post.views += 1; db.commit()` 就能累计浏览量了。
+
+</details>
+
+### 练习 2：回退再升回来，亲眼看列消失与重现
+
+在练习 1 的基础上执行 `alembic downgrade -1`，用 DB Browser 观察 posts 表；再 `alembic upgrade head`，再观察一次。思考：如果回退前 views 列已经记了一些数字，回退后它们去哪了？
+
+<details><summary>参考答案</summary>
+
+```bash
+# 回退一个版本（撤销最近一次迁移）
+$ alembic downgrade -1
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running downgrade f6e5d4c3b2a1 -> a1b2c3d4e5f6, add views to posts
+
+# 此时查看版本：回到了上一个迁移
+$ alembic current
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+a1b2c3d4e5f6
+```
+
+用 DB Browser 打开 blog.db：posts 表的 views 列**没了**，但文章数据都在；再执行 `alembic upgrade head`，`Running upgrade ... add views to posts` 的日志重新出现，views 列也回来了。
+
+关于那道思考题：**已经记下的浏览量丢了**。downgrade 执行的是真正的 `DROP COLUMN`，不是「隐藏」，列连同里面的数据一起删掉；升回来时是新加一个全为 0 的列，旧值不会复活。所以生产环境回滚迁移前必须先备份数据库——回滚结构容易，找回数据难。
+
+</details>
 
 ## 本章小结
 

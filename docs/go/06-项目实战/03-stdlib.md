@@ -4,6 +4,8 @@
 
 Go 标准库以"开箱即用"著称，很多其他语言要装第三方库的功能，Go 标准库直接提供。
 
+> `fmt` 大家已经用了五章，`Println`/`Printf` 随手就来，本篇不再单独讲它。
+
 ## 一、strings：字符串操作
 
 ```go
@@ -218,5 +220,48 @@ func main() {
 1. 写程序统计一句英文句子中每个单词的出现次数，按字母序输出（综合 strings + map + 排序）。
 2. 写程序把一个 `[]User` 序列化成 JSON 写入 `users.json` 文件，再读出来反序列化并打印（json + os）。
 3. 写交互程序：提示用户输入生日（如 2000-01-01），计算并输出已经活了多少天（bufio + time）。
+
+<details>
+<summary>点击查看答案（要点）</summary>
+
+**1. 词频统计**：`words := strings.Fields(s)` 按空白拆词（比 Split 稳，多几个空格也不怕）→ `for _, w := range words { counts[w]++ }`（map 取不存在的 key 得零值，直接 `++` 就行）→ 排序输出：
+
+```go
+keys := make([]string, 0, len(counts))
+for k := range counts {
+    keys = append(keys, k)
+}
+slices.Sort(keys)           // 需要 import "slices"（Go 1.21+）
+for _, k := range keys {
+    fmt.Println(k, counts[k])
+}
+```
+
+**2. JSON 落盘再读回**：`data, _ := json.MarshalIndent(users, "", "  ")` 带缩进序列化 → `os.WriteFile("users.json", data, 0644)` 写入 → `raw, err := os.ReadFile("users.json")` 读回 → `json.Unmarshal(raw, &got)` 反序列化（**第二个参数必须传指针 `&got`**）→ 打印验证和原来一致。
+
+**3. 活了多少天**：`birth, err := time.Parse("2006-01-02", input)` 解析生日 → 生日在过去，`time.Until(birth)` 算出来是**负数**，记得取负：
+
+```go
+days := int(-time.Until(birth).Hours() / 24)
+fmt.Printf("已经活了 %d 天\n", days)
+```
+
+（`time.Since(birth)` 等价于 `-time.Until(birth)`，用哪个都行。别忘了处理 Parse 的 err——用户敲个"2000/01/01"就解析失败。）
+
+</details>
+
+## 本节小结
+
+- 日常 Top5：`strings` 拆拼替换、`strconv` 数字字符串互转、`time` 时间、`os` 文件、`encoding/json` 序列化——记不住 API 正常，知道有它、会查文档就是本事
+- JSON 三步走：结构体打 tag → `Marshal` 出去 → `Unmarshal`（传指针）回来
+- 时间格式化用参考时间 `2006-01-02 15:04:05`，不是 yyyy-MM-dd
+
+### 本篇三大坑
+
+| 坑 | 现象 | 一句话记住 |
+|----|------|-----------|
+| JSON 字段小写 | 序列化结果里字段**静默消失**，不报任何错 | 字段名首字母必须大写 |
+| Unmarshal 没传指针 | 解析"成功"，结构体却还是零值 | 第二个参数写 `&u2` |
+| time 格式化写成 yyyy-MM-dd | `Format` 原样输出 `yyyy-MM-dd` 这串字符 | 模板只能是 `2006-01-02 15:04:05` |
 
 下一节，把所学全部串起来：[6.4 实战项目：命令行待办清单](04-project-todo-cli.md)

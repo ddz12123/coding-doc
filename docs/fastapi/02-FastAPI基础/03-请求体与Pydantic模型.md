@@ -60,6 +60,32 @@ FastAPI 自动帮你完成了：
 
 试试发一个缺 `email` 的请求，或者把 `age` 写成 `"abc"`，观察 422 错误信息——它会精确告诉你哪个字段错了、为什么错。
 
+比如在 `/docs` 的请求体编辑框里删掉 `email` 再发送：
+
+```json
+{
+  "username": "xiaoming",
+  "age": 18
+}
+```
+
+会收到 422：
+
+```json
+{
+  "detail": [
+    {
+      "type": "missing",
+      "loc": ["body", "email"],
+      "msg": "Field required",
+      "input": {"username": "xiaoming", "age": 18}
+    }
+  ]
+}
+```
+
+看懂三个字段你就掌握了排查方法：`loc: ["body", "email"]` 表示**请求体里的 email 字段**出了问题，`msg` 说明原因是缺字段，`input` 把你实际发的原样回显，方便对照。再把 `age` 改成 `"abc"` 发一次，会看到 `loc: ["body", "age"]`、`type: "int_parsing"` 的错误。
+
 ## 3. 字段校验：Field
 
 类型注解只能保证「是个字符串/整数」，更细的规则用 `Field`：
@@ -144,6 +170,27 @@ user.model_dump(exclude_unset=True)   # 只包含调用方实际传了的字段�
 UserCreate.model_validate({"username": "x", "email": "a@b.com", "age": 1})  # 从字典创建并校验
 ```
 
+实际运行结果对照（`UserCreate` 是第 2 节的四字段模型，创建时**没传** `bio`）：
+
+```python
+user = UserCreate(username="xiaoming", email="a@b.com", age=18)
+
+user.model_dump()
+# {'username': 'xiaoming', 'email': 'a@b.com', 'age': 18, 'bio': None}
+
+user.model_dump(exclude_unset=True)
+# {'username': 'xiaoming', 'email': 'a@b.com', 'age': 18}
+# ↑ 对比上面：bio 没传就不出现。"只更新调用方真正传了的字段"就靠它
+
+user.model_dump_json()
+# '{"username":"xiaoming","email":"a@b.com","age":18,"bio":null}'
+
+UserCreate.model_validate({"username": "x", "email": "a@b.com", "age": 1})
+# UserCreate(username='x', email='a@b.com', age=1, bio=None)
+```
+
+注意 `model_dump()` 和 `exclude_unset` 的区别只体现在**有默认值且没传的字段**上（这里是 `bio`）：前者补上默认值 `None` 全量导出，后者直接略过。
+
 > 这些是 Pydantic v2 的方法名。如果你看到旧教程里写 `.dict()`、`.json()`、`parse_obj()`，那是 v1 的老写法，含义相同。
 
 ## 7. 为什么要为「创建」和「返回」定义不同的模型？
@@ -171,6 +218,84 @@ class UserOut(BaseModel):
 ```
 
 这个模式叫 **Schema 分离**，是后端开发的重要实践。`UserOut` 怎么用？下一章「响应模型」马上讲。
+
+## 8. 练习
+
+**动手题**：定义一个 `ArticleCreate` 模型，并写一个 `POST /articles` 接口创建文章：
+
+- `title`：必填，长度 1~100 个字符
+- `content`：可空（不传就是 `None`）
+- `tags`：字符串列表，默认空列表
+- 接口给文章分配自增 id 并返回创建结果
+- 写完后**故意**发两个会失败的请求：空标题、101 个字符的超长标题，观察 422
+
+<details>
+<summary>参考答案</summary>
+
+```python
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+next_id = 1
+articles: dict[int, dict] = {}
+
+
+class ArticleCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=100, description="标题，1-100个字符")
+    content: str | None = None          # 可空：不传就是 None
+    tags: list[str] = []                # 列表字段，默认空列表
+
+
+@app.post("/articles")
+def create_article(article: ArticleCreate):
+    global next_id
+    saved = {"id": next_id, **article.model_dump()}
+    articles[next_id] = saved
+    next_id += 1
+    return saved
+```
+
+正常请求：
+
+```bash
+curl -X POST http://127.0.0.1:8000/articles \
+  -H "Content-Type: application/json" \
+  -d '{"title": "FastAPI 入门", "tags": ["python", "fastapi"]}'
+```
+
+```json
+{"id": 1, "title": "FastAPI 入门", "content": null, "tags": ["python", "fastapi"]}
+```
+
+注意 `content` 没传时正常返回 `null`，这是"可空"字段的表现。
+
+故意失败——传空标题（违反 `min_length=1`）：
+
+```bash
+curl -X POST http://127.0.0.1:8000/articles \
+  -H "Content-Type: application/json" \
+  -d '{"title": ""}'
+```
+
+```json
+{
+  "detail": [
+    {
+      "type": "string_too_short",
+      "loc": ["body", "title"],
+      "msg": "String should have at least 1 character",
+      "input": "",
+      "ctx": {"min_length": 1}
+    }
+  ]
+}
+```
+
+超长标题则会收到 `type: "string_too_long"`、`msg: "String should have at most 100 characters"`、`ctx: {"max_length": 100}` 的同类错误，可以自己试一次。
+
+</details>
 
 ## 本章小结
 

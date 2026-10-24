@@ -132,7 +132,7 @@ sadd uv:2026-07-26 用户1001     # 同一用户当天访问多少次都只记�
 scard uv:2026-07-26             # 今天的独立访客数
 ```
 
-> 💡 如果用户量上亿，Set 会很占内存，这时用 HyperLogLog（第 06 章介绍）。
+> 💡 如果用户量上亿，Set 会很占内存，这时用 HyperLogLog（[2.7 其他数据类型概览](07-其他数据类型概览.md)介绍）。
 
 ## 6. Set vs List 怎么选
 
@@ -148,6 +148,61 @@ scard uv:2026-07-26             # 今天的独立访客数
 2. 判断用户 200 是否点过赞、用户 999 是否点过赞
 3. 建立两个班级的选修课名单 `course:python` 和 `course:java`，各放几个学生（有重叠），求：两门都选的、至少选了一门的、只选 Python 的
 4. 用 `spop` 从任意 Set 里模拟一次抽奖
+
+<details>
+<summary>参考答案</summary>
+
+第 1 题（注意重复点赞那次 `sadd` 返回 0）：
+
+```
+127.0.0.1:6379> sadd article:1:likes 100 200 300
+(integer) 3
+127.0.0.1:6379> sadd article:1:likes 100
+(integer) 0                     # 100 已存在，没有新增
+127.0.0.1:6379> scard article:1:likes
+(integer) 3
+```
+
+第 2 题：
+
+```
+127.0.0.1:6379> sismember article:1:likes 200
+(integer) 1                     # 点过
+127.0.0.1:6379> sismember article:1:likes 999
+(integer) 0                     # 没点过
+```
+
+第 3 题（先造数据，再做三种运算）：
+
+```
+127.0.0.1:6379> sadd course:python 小明 小红 小刚
+(integer) 3
+127.0.0.1:6379> sadd course:java 小红 小刚 小华
+(integer) 3
+127.0.0.1:6379> sinter course:python course:java     # 两门都选
+1) "小红"
+2) "小刚"
+127.0.0.1:6379> sunion course:python course:java      # 至少选一门
+1) "小明"
+2) "小红"
+3) "小刚"
+4) "小华"
+127.0.0.1:6379> sdiff course:python course:java       # 只选 Python
+1) "小明"
+```
+
+第 4 题：
+
+```
+127.0.0.1:6379> sadd pool 张三 李四 王五 赵六
+(integer) 4
+127.0.0.1:6379> spop pool
+"赵六"
+127.0.0.1:6379> scard pool
+(integer) 3                     # 中奖者已移出池子，不会重复中奖
+```
+
+</details>
 
 ## 8. 小结
 

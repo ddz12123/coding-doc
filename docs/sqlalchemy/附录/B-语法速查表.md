@@ -38,7 +38,8 @@ import enum
 from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, Any
-from sqlalchemy import String, Text, Numeric, JSON, ForeignKey, func, Index
+from sqlalchemy import (String, Text, Numeric, JSON, ForeignKey, Table,
+                        Column, func, Index)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 class User(Base):
@@ -67,8 +68,8 @@ class Status(enum.Enum):
     CLOSED = "closed"
 status: Mapped[Status] = mapped_column(default=Status.ACTIVE)
 
-# 联合索引
-__table_args__ = (Index("ix_user_time", "user_id", "created_at"),)
+# 联合索引（列名必须与上方模型中真实存在的列一致）
+__table_args__ = (Index("ix_name_created", "name", "created_at"),)
 ```
 
 ## 三、关系定义
@@ -223,7 +224,10 @@ async with engine.begin() as conn:
 ```python
 # database.py
 from typing import Annotated, Generator
-from fastapi import Depends
+
+from fastapi import Depends, HTTPException
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 engine = create_engine("sqlite:///app.db",
                        connect_args={"check_same_thread": False})

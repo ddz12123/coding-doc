@@ -72,6 +72,20 @@ Docker 的做法很直接：把**代码、运行时、系统库、配置**统统
 docker run -d -p 8080:80 nginx:1.25
 ```
 
+第一次执行会先从仓库下载镜像，最后一行回显一串 64 位的十六进制哈希：
+
+```text
+Unable to find image 'nginx:1.25' locally
+1.25: Pulling from library/nginx
+addd280ecc6e: Pull complete
+86e8...f3a1: Pull complete
+...
+Status: Downloaded newer image for nginx:1.25
+f0e92a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f
+```
+
+这串哈希就是刚创建的**容器 ID**——后面用 `docker ps` 查看容器时，表格里的 `CONTAINER ID` 列就是它的前 12 位。
+
 这条命令做了什么：
 
 1. 本地没有 `nginx:1.25` 镜像，就自动从仓库下载
@@ -79,6 +93,21 @@ docker run -d -p 8080:80 nginx:1.25
 3. 把宿主机的 8080 端口映射到容器的 80 端口（`-p 8080:80`）
 
 然后浏览器打开 `http://localhost:8080` 就能看到 Nginx 欢迎页。用完删掉容器，系统干干净净，就像什么都没发生过。
+
+## 动手练习
+
+到 [hub.docker.com](https://hub.docker.com) 搜索 `nginx`，进入官方镜像页面，翻一翻它的 Tags 列表。思考：如果你要在**生产环境**部署一个 Nginx，`1.25`、`1.25-alpine`、`latest` 三个标签应该选哪个？各自的取舍是什么？
+
+<details>
+<summary>参考答案</summary>
+
+- **`1.25`（生产首选）**：版本明确，今天拉和明天拉是同一个东西，行为可预期、问题可复现。生产环境的原则就是「永远用明确的版本号」。
+- **`1.25-alpine`**：基于 Alpine Linux，镜像体积只有正式版的几分之一（约 50MB vs 190MB），拉取快、攻击面小。但它用 musl libc 替代 glibc，依赖 C 扩展的程序偶尔会遇到兼容性问题，选用前需要完整测试一遍。
+- **`latest`（生产禁用）**：它指向的版本随时可能被官方更新，等于把升级时机交给了别人，出了问题都不知道环境变没变。
+
+结论：默认选 `1.25` 这类明确版本；对镜像体积敏感且验证过兼容性，可以选 alpine 变体；`latest` 一律不进生产。
+
+</details>
 
 ## 小结
 

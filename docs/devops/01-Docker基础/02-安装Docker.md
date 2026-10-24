@@ -105,6 +105,54 @@ docker info
 docker run hello-world
 ```
 
+三条命令各能看到什么：
+
+`docker info` 的输出很长，配置过镜像加速的话，找到 `Registry Mirrors` 一段——里面列出你配置的地址，就说明加速已生效：
+
+```text
+...
+ Server:
+  Containers: 0
+   Running: 0
+  ...
+  Registry Mirrors:
+   https://docker.m.daocloud.io/
+   https://dockerproxy.net/
+  Live Restore Enabled: false
+...
+```
+
+`docker run hello-world` 首次运行的完整输出长这样：
+
+```text
+Unable to find image 'hello-world:latest' locally
+latest: Pulling from library/hello-world
+e6590340b5f3: Pull complete
+Digest: sha256:9fa9bf5e3e7c9f9e0d1e8d4c8a7d6b5c4e3f2a1d0c9b8a7f6e5d4c3b2a1f0e9d
+Status: Downloaded newer image for hello-world:latest
+
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+
+To generate this message, Docker took the following steps:
+ 1. The Docker client contacted the Docker daemon.
+ 2. The Docker daemon pulled the "hello-world" image from the Docker Hub.
+    (amd64)
+ 3. The Docker daemon created a new container from that image which runs the
+    executable that produces the output you are currently reading.
+ 4. The Docker daemon streamed that output to the Docker client, which sent it
+    to your terminal.
+
+To try something more ambitious, you can run an Ubuntu container with:
+ $ docker run -it ubuntu bash
+
+Share images, automate workflows, and more with a free Docker ID:
+ https://hub.docker.com/
+
+For more examples and ideas, visit:
+ https://docs.docker.com/get-started/
+```
+
 如果 `docker run hello-world` 输出了 `Hello from Docker!` 开头的一段文字，说明安装成功：Docker 成功拉取了镜像并启动了容器。
 
 顺便确认 Compose v2 也已就绪（Docker 24+ 默认自带）：
@@ -122,6 +170,29 @@ docker compose version
 | `Cannot connect to the Docker daemon` | Docker 服务没启动：`sudo systemctl start docker` |
 | 拉镜像一直超时 | 没配镜像加速，见第 4 节 |
 | Windows 提示 WSL2 相关错误 | 执行 `wsl --update` 更新 WSL 内核后重启 Docker Desktop |
+
+## 动手练习
+
+配置镜像加速并重启 Docker 之后，重新执行 `docker info`，确认输出里的 `Registry Mirrors` 一栏显示的是你配置的加速地址——这是判断镜像加速是否生效的最直接方式。
+
+<details>
+<summary>参考答案</summary>
+
+```bash
+docker info | grep -A 3 "Registry Mirrors"
+```
+
+输出里能看到自己的加速地址即为生效：
+
+```text
+ Registry Mirrors:
+  https://docker.m.daocloud.io/
+  https://dockerproxy.net/
+```
+
+如果这一栏是空的，回去检查 `daemon.json` 是否保存成功、`systemctl restart docker` 是否执行过。
+
+</details>
 
 ## 小结
 

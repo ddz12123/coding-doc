@@ -128,6 +128,36 @@ go vet ./...   # 检查常见错误（比如格式化占位符用错）
 2. 执行 `go env GOPROXY`，确认你的代理配置是否生效。
 3. 故意把 `go.mod` 里的 `require` 行删掉，运行 `go run .` 看报错，然后用 `go mod tidy` 修复它。
 
+<details>
+<summary>点击查看练习 3 答案</summary>
+
+删掉 require 行后，`go run .` 的真实报错长这样：
+
+```text
+main.go:3:8: no required module provides package github.com/fatih/color; to add it:
+        go get github.com/fatih/color
+```
+
+人话翻译：代码 import 了 color 包，但 `go.mod` 里没有它的依赖记录，Go 不知道去哪找——报错还贴心地给出了修复命令。
+
+不过我们用 tidy 来修：
+
+```bash
+go mod tidy    # 扫描代码：import 用到但 go.mod 没记的依赖，自动下载并补回 require 行
+go run .       # 又能跑了，彩色文字回来了
+```
+
+记住这个条件反射：**依赖报错，先跑 `go mod tidy`**。
+
+</details>
+
+## 本节小结
+
+- 日常主力命令就仨：`go run .` 开发跑、`go build` 出交付物、`go mod tidy` 整理依赖
+- 模块 = 项目 + 依赖清单；清单是 `go.mod`、校验账本是 `go.sum`——都不手编、不删除，提交 git 时一起带上
+- `go get` 给**当前项目**装依赖（写进 go.mod）；`go install` 装**全局命令行工具**（进 GOPATH/bin），别搞混
+- 新项目标准开局三步：建目录 → `go mod init 名字` → 写 main.go
+
 ---
 
 🎉 第一章完成！你已经具备了 Go 开发的基本环境和工具知识。

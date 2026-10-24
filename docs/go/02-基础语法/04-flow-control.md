@@ -218,6 +218,7 @@ default:
 和 if 一样的套路：
 
 ```go
+// 需要 import "time"
 switch hour := time.Now().Hour(); {
 case hour < 12:
     fmt.Println("上午好")

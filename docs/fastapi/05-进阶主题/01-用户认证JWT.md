@@ -199,7 +199,30 @@ def update_post(
     return crud.update_post(db, post, post_in)
 ```
 
-删除接口同理加上作者检查。`crud.create_post` 相应改为接收 `author_id` 参数：
+删除接口同理加上作者检查，完整代码如下（对照 4.4 章，就是在原有 404 检查后面多一层 403）：
+
+```python
+@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(post_id: int, db: SessionDep, current_user: CurrentUser):
+    """删除文章（仅作者本人）"""
+    post = crud.get_post(db, post_id)
+    if post is None:
+        raise HTTPException(status_code=404, detail="文章不存在")
+    if post.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="只能删除自己的文章")
+    crud.delete_post(db, post)
+```
+
+改完后 DELETE /posts/{post_id} 一共四种结果，层层递进：
+
+| 请求情况 | 状态码 | 由谁拦下 |
+|---|---|---|
+| 没带 Token | 401 | `CurrentUser` 依赖 |
+| 文章不存在 | 404 | 第一层 if |
+| 登录了但不是作者 | 403 | 第二层 if |
+| 作者本人删除 | 204 | 成功 |
+
+`crud.create_post` 相应改为接收 `author_id` 参数：
 
 ```python
 def create_post(db: Session, post_in: schemas.PostCreate, author_id: int) -> models.Post:
@@ -223,7 +246,18 @@ def read_me(current_user: CurrentUser):
     return current_user
 ```
 
-最后在 main.py 挂载 auth 路由：`app.include_router(auth.router)`。
+最后在 main.py 挂载 auth 路由。在原有代码基础上加 `auth` 一处导入、一行挂载：
+
+```python
+# app/main.py
+from app.routers import auth, posts, users   # ← 导入列表里加上 auth
+
+app.include_router(users.router)
+app.include_router(posts.router)
+app.include_router(auth.router)              # ← 新增：提供 POST /login
+```
+
+挂载后重启服务，打开 /docs 能看到「认证」分组下多了 POST /login；因为 deps.py 里配了 `tokenUrl="/login"`，页面右上角也出现了 Authorize 按钮——三处配置环环相扣。
 
 ## 8. 在 /docs 里测试完整流程
 
@@ -243,6 +277,99 @@ curl -X POST http://127.0.0.1:8000/login -d "username=xiaoming&password=123456"
 # 带 token 访问
 curl http://127.0.0.1:8000/users/me -H "Authorization: Bearer <粘贴token>"
 ```
+
+## 9. 练习
+
+### 练习 1：实现 PATCH /users/me（只能改自己的资料）
+
+4.3 章的 PATCH /users/{user_id} 谁都能改任何用户，配上本章的认证后明显不合理。请用 `CurrentUser` 依赖实现一个「修改自己资料」的接口。提示：路由要放在 `/{user_id}` 之前；schemas 里已有现成的 `UserUpdate` 可直接复用。
+
+<details><summary>参考答案</summary>
+
+```python
+# app/routers/users.py 新增（放在 @router.get("/{user_id}") 之前！）
+# 文件顶部确保有：from app.deps import CurrentUser
+
+@router.patch("/me", response_model=schemas.UserOut)
+def update_me(
+    user_in: schemas.UserUpdate, current_user: CurrentUser, db: SessionDep
+):
+    """修改自己的资料（用户名/邮箱，只改传了的字段）"""
+    # 改用户名要先查重，逻辑与 4.3 章的 update_user 相同
+    if user_in.username and user_in.username != current_user.username:
+        if crud.get_user_by_username(db, user_in.username):
+            raise HTTPException(status_code=409, detail="用户名已存在")
+    return crud.update_user(db, current_user, user_in)
+```
+
+验证流程：登录 → PATCH /users/me 传 `{"email": "new@qq.com"}` → 返回 200 → GET /users/me 确认邮箱变了；再试试不登录直接改 → 401。
+
+这个接口天然「只能改自己」——它根本不接收 user_id 参数，操作对象永远是 `current_user`，别人想改你的资料，连指定目标的入口都没有。这就是设计上的安全：不靠检查「是不是本人」，而是「只可能操作本人」。
+
+</details>
+
+### 练习 2：验证过期 Token 返回 401
+
+把 `app/security.py` 里的 `ACCESS_TOKEN_EXPIRE_MINUTES` 改成 `0`，重启后重新登录拿 Token，立刻访问 GET /users/me，观察返回什么？测完记得改回原值。进阶：能说清这个 401 是从哪一步抛出来的吗？
+
+<details><summary>参考答案</summary>
+
+```python
+# app/security.py
+ACCESS_TOKEN_EXPIRE_MINUTES = 0   # Token 一签发就过期
+```
+
+```bash
+# 1. 登录照常拿到 token（签发时不检查有效期，所以这一步不会报错）
+TOKEN=$(curl -s -X POST http://127.0.0.1:8000/login \
+  -d "username=xiaoming&password=123456" \
+  | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+# 2. 立刻访问
+curl -i http://127.0.0.1:8000/users/me -H "Authorization: Bearer $TOKEN"
+# HTTP/1.1 401 Unauthorized
+# {"detail":"无效或过期的登录凭证"}
+```
+
+401 的来路：Token 签名虽然合法，但 `jwt.decode` 发现 `exp` 已过，抛出 `ExpiredSignatureError`（`InvalidTokenError` 的子类）→ `decode_access_token` 捕获后返回 None → `get_current_user` 里第一个检查把它变成 401。
+
+不想重启改配置的话，也可以手工签发一个「昨天就过期」的 Token 来测：
+
+```python
+# make_expired_token.py，放项目根目录，运行：python make_expired_token.py
+from datetime import datetime, timedelta, timezone
+
+import jwt
+
+from app.security import ALGORITHM, SECRET_KEY
+
+payload = {
+    "sub": "1",   # 假装是 1 号用户
+    "exp": datetime.now(timezone.utc) - timedelta(seconds=1),
+}
+print(jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM))
+```
+
+把输出的 Token 塞进请求头，同样得到 401——签名能对上，但过期就是不行。
+
+</details>
+
+### 练习 3（思考题）：JWT 如何实现「退出登录」？
+
+传统 Session 登录是「退出 = 删服务器上的会话记录」。但 JWT 的服务器根本不存 Token——那「退出登录」该怎么实现？再想深一层：客户端删了 Token，万一 Token 已经泄露，还能防住吗？
+
+<details><summary>参考答案</summary>
+
+JWT 是无状态的：服务器只验签，不记录「谁还登录着」，所以标准做法是纯客户端行为：
+
+1. **客户端删除 Token**——清掉 localStorage（或内存）里保存的值，之后的请求不再带 `Authorization` 头，等效于退出
+2. **配合较短的过期时间**（如 30 分钟～2 小时），即使 Token 残留或泄露，能作恶的窗口也有限；敏感操作可再加二次验证
+
+但这有个天生缺口：Token 在过期前始终有效，一旦泄露，即使用户点了「退出」，拿到 Token 的人照样能用。要做到「服务端立刻作废」，需要**黑名单机制**——退出时把该 Token（或载荷里的 jti 标识）写入 Redis 并设置与 Token 相同的剩余存活时间，`get_current_user` 验签之后再查一步「是否在黑名单」。
+
+黑名单等于给无状态 JWT 加回了状态，增加了一跳查询成本，通常只有支付、账号安全这类高要求场景才值得上。日常项目：客户端删 Token + 短过期时间，已经够用。
+
+</details>
 
 ## 本章小结
 

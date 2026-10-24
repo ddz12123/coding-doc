@@ -54,7 +54,7 @@ AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
 # async_demo.py
 import asyncio
 
-from sqlalchemy import String, select
+from sqlalchemy import String, func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -108,6 +108,7 @@ async def main():
         await session.commit()
 
         count = await session.scalar(select(func.count()).select_from(User))
+        print(f"共 {count} 个用户")            # 首次运行：共 2 个用户
 
 
 asyncio.run(main())
@@ -166,6 +167,92 @@ async with AsyncSessionLocal() as session:
 | FastAPI 高并发生产项目 | 异步，吞吐优势明显 |
 
 **本教程第 6、7 章采用同步方式教学**（对新手更友好），并在最后给出异步版本的改造对照。你已经看到了：改造是机械的。
+
+## 🎯 练习
+
+**把同步查询翻译成 async 版**
+
+下面是同步版的"成年用户按年龄升序"查询。把它改写成完整可运行的异步脚本（建表 + 播种 + 查询），运行后对比两版的 echo 输出——SQL 应当一字不差：
+
+```python
+# 同步版（参照）
+with SessionLocal() as session:
+    stmt = select(User).where(User.age >= 18).order_by(User.age)
+    for user in session.scalars(stmt).all():
+        print(user)
+```
+
+<details><summary>参考答案</summary>
+
+```python
+# async_practice.py
+import asyncio
+
+from sqlalchemy import String, select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
+    age: Mapped[int]
+
+    def __repr__(self) -> str:
+        return f"User(id={self.id}, name={self.name!r}, age={self.age})"
+
+
+engine = create_async_engine("sqlite+aiosqlite:///async_practice.db", echo=True)
+AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+
+async def main():
+    async with engine.begin() as conn:                 # 建表要包 run_sync
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with AsyncSessionLocal() as session:
+        session.add_all([User(name="张三", age=25),
+                         User(name="李四", age=17),     # 未成年，应被过滤
+                         User(name="王五", age=30)])
+        await session.commit()
+
+    async with AsyncSessionLocal() as session:
+        stmt = select(User).where(User.age >= 18).order_by(User.age)
+        result = await session.scalars(stmt)           # 执行要 await
+        for user in result.all():
+            print(user)
+
+
+asyncio.run(main())
+```
+
+预期输出：
+
+```text
+User(id=1, name='张三', age=25)
+User(id=3, name='王五', age=30)
+```
+
+关键差异行对照（同步 → 异步，其余代码原样不动）：
+
+```python
+create_engine("sqlite:///x.db")             # → create_async_engine("sqlite+aiosqlite:///x.db")
+sessionmaker(bind=engine)                   # → async_sessionmaker(bind=engine, expire_on_commit=False)
+Base.metadata.create_all(engine)            # → async with engine.begin() as conn: await conn.run_sync(...)
+with SessionLocal() as session:             # → async with AsyncSessionLocal() as session:
+session.scalars(stmt).all()                 # → (await session.scalars(stmt)).all()
+# 入口：整个 main 包成 async def，用 asyncio.run(main()) 启动
+```
+
+看 echo 日志：INSERT 和 `SELECT ... WHERE users.age >= ? ORDER BY users.age` 与同步版**完全相同**——异步改的是"怎么执行、怎么等待"，不改 SQL。
+
+</details>
 
 ## 📝 本节小结
 

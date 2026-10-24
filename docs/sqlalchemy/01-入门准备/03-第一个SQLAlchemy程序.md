@@ -172,6 +172,108 @@ ORDER BY users.age
 
 而且**全程没有手写一句 SQL**。这就是 ORM。
 
+## 五、练习
+
+### 练习 1：改过滤条件（动手）
+
+把第 5 步查询的过滤条件从"成年（age >= 18）"改成"未成年（age < 18）"，重新运行。预期输出是什么？
+
+<details><summary>参考答案</summary>
+
+只需改一行：
+
+```python
+    # 查询所有未成年用户（age < 18），按年龄排序
+    stmt = select(User).where(User.age < 18).order_by(User.age)
+    users = session.scalars(stmt).all()
+```
+
+预期输出（现在轮到 25、30 岁的被过滤掉了）：
+
+```
+========== 查询结果 ==========
+  王五，17岁，邮箱 wangwu@example.com
+```
+
+echo 日志里对应的 SQL 也变成了 `WHERE users.age < ?`（参数 18）。
+
+</details>
+
+### 练习 2：加一个可空列（动手）
+
+给 `User` 模型加一个可空的 `nickname`（昵称）列再重跑。**先想清楚：直接重跑，nickname 列会出现在表里吗？**该怎么处理？
+
+<details><summary>参考答案</summary>
+
+修改模型（用 `Optional` 注解声明可空，别忘了顶部 `from typing import Optional`）：
+
+```python
+from typing import Optional
+
+class User(Base):
+    """User 类 ←→ users 表"""
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
+    email: Mapped[str] = mapped_column(String(100))
+    age: Mapped[int]
+    nickname: Mapped[Optional[str]] = mapped_column(String(50))   # 新增：可空
+```
+
+**必须先删除 `first.db` 再运行**：`create_all` 只创建不存在的表，**不会给已存在的表加列**（这个坑在 2.2 节会正式讲）。直接重跑不报错，但 nickname 列根本不会出现。
+
+删库重跑后，插入时没传 nickname，它就是 `None`。把打印语句改成带昵称的版本：
+
+```python
+    for user in users:
+        print(f"  {user.name}，{user.age}岁，昵称 {user.nickname}")
+```
+
+预期输出：
+
+```
+========== 查询结果 ==========
+  张三，25岁，昵称 None
+  李四，30岁，昵称 None
+```
+
+也可以在创建对象时给王五传 `nickname="小五"`——但未成年查不到他，想看到效果记得改过滤条件。
+
+</details>
+
+### 练习 3：预测题
+
+不删 `first.db`，把 `first_demo.py` 原样再运行一次。问：现在 `users` 表里叫"张三"的记录有几条？整表共几行？
+
+<details><summary>参考答案</summary>
+
+**张三 2 条，整表 6 行。**
+
+原因：脚本里的插入代码（第 4 步）每次运行都会**无条件执行一遍**；`create_all` 发现表已存在会跳过建表，但挡不住 INSERT。这正是第二节末尾那个 💡 提示的含义——**脚本是"每次都插入"，不是"查一下没有才插入"**。
+
+验证代码：
+
+```python
+from sqlalchemy import create_engine, text
+
+engine = create_engine("sqlite:///first.db")
+with engine.connect() as conn:
+    zhangsan = conn.execute(
+        text("SELECT COUNT(*) FROM users WHERE name = '张三'")
+    ).scalar_one()
+    total = conn.execute(text("SELECT COUNT(*) FROM users")).scalar_one()
+    print(f"张三: {zhangsan} 条，整表: {total} 行")
+```
+
+预期输出：
+
+```
+张三: 2 条，整表: 6 行
+```
+
+</details>
+
 ## 📝 本节小结
 
 - 五步流程：**Engine → 模型 → 建表 → Session 写入 → select 查询**

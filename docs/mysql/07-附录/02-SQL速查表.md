@@ -161,7 +161,7 @@
 | `REVOKE 权限 ON 库.表 FROM '用户'@'主机';` | 收回权限 | `REVOKE SELECT ON school.v_score_report FROM 'teacher'@'localhost';` |
 | `ALTER USER '用户'@'主机' IDENTIFIED BY '新密码';` | 修改密码 | `ALTER USER 'teacher'@'localhost' IDENTIFIED BY 'New@2026';` |
 | `DROP USER '用户'@'主机';` | 删除用户 | `DROP USER 'teacher'@'localhost';` |
-| `FLUSH PRIVILEGES;` | 刷新权限 | `FLUSH PRIVILEGES;` |
+| `FLUSH PRIVILEGES;` | 刷新权限（仅手动改过系统表后需要；GRANT/REVOKE 会自动生效） | `FLUSH PRIVILEGES;` |
 
 ## 十四、备份与恢复（系统命令行执行，不是 SQL）
 

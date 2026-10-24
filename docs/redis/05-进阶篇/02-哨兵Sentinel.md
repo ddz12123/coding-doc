@@ -50,6 +50,31 @@ flowchart TD
 7. 通知其余从节点 `replicaof 新主`
 8. 旧主恢复后，自动降级为新主的从节点
 
+用一张时序图把 8 步串起来：
+
+```mermaid
+sequenceDiagram
+    participant M as 主节点
+    participant S1 as 哨兵1
+    participant S2 as 哨兵2
+    participant S3 as 哨兵3
+    participant R1 as 从节点1
+    participant R2 as 从节点2
+
+    Note over M: 主节点宕机
+    S1--xM: ping 不通（各哨兵陆续发现）
+    S1->>S2: 我主观下线了，你们呢？
+    S1->>S3: 我主观下线了，你们呢？
+    S2-->>S1: 我也 ping 不通
+    S3-->>S1: 我也 ping 不通
+    Note over S1,S3: 达到 quorum=2 → 客观下线
+    S1->>S1: 哨兵间选举领头（Raft）
+    S1->>R1: replicaof no one（升级为新主）
+    S1->>R2: replicaof R1（改认新主）
+    Note over M: 旧主恢复上线
+    S1->>M: replicaof R1（降级为从）
+```
+
 整个过程通常几秒到几十秒，**期间写请求会失败**，客户端要有重试机制。
 
 ## 4. 最小配置示例（了解即可）
@@ -86,7 +111,70 @@ replica.get("k")         # 读走从
 # 主从切换后，sentinel 客户端会自动连上新主，业务代码无感
 ```
 
-## 5. 哨兵模式的局限
+## 5. 动手实验：亲眼看一次自动切换（可选）
+
+用 Docker 起 1 主 2 从 + 3 哨兵，然后"杀掉"主节点，全程观察哨兵自动切换：
+
+```bash
+# 所有容器放进同一个网络，才能用容器名互相找到
+docker network create redis-net
+
+# 1 主 2 从
+docker run -d --name master --network redis-net -p 6379:6379 redis:7
+docker run -d --name slave1 --network redis-net -p 6380:6379 \
+  redis:7 redis-server --replicaof master 6379
+docker run -d --name slave2 --network redis-net -p 6381:6379 \
+  redis:7 redis-server --replicaof master 6379
+
+# 3 个哨兵（现场生成最小配置再启动，5 秒判下线让实验更快）
+for p in 26379 26380 26381; do
+  docker run -d --name sentinel-$p --network redis-net -p $p:26379 redis:7 \
+    sh -c "echo 'sentinel monitor mymaster master 6379 2' > /s.conf && \
+           echo 'sentinel down-after-milliseconds mymaster 5000' >> /s.conf && \
+           redis-sentinel /s.conf"
+done
+```
+
+切换前先看一眼当前主节点信息：
+
+```bash
+$ docker exec -it sentinel-26379 redis-cli -p 26379 sentinel masters
+1)  1) "name"
+    2) "mymaster"
+    3) "ip"
+    4) "172.18.0.2"          # 旧主（master 容器）的地址
+    5) "port"
+    6) "6379"
+    7) "flags"
+    8) "master"
+```
+
+杀掉主节点，连续观察输出变化：
+
+```bash
+docker stop master
+
+# 几秒后：flags 出现下线标记
+$ docker exec -it sentinel-26379 redis-cli -p 26379 sentinel masters
+    4) "172.18.0.2"
+    7) "flags"
+    8) "master,s_down,disconnected"     # 判定下线，正在切换
+
+# 十几秒后：ip 已变成新主（原从节点），flags 恢复 master
+$ docker exec -it sentinel-26379 redis-cli -p 26379 sentinel masters
+    3) "ip"
+    4) "172.18.0.3"          # 换成某个从节点的地址了
+    7) "flags"
+    8) "master"
+
+# 验证：两个原从节点中，有一个 role 变成了 master
+$ docker exec -it slave1 redis-cli info replication | grep role
+role:master
+```
+
+从"下线标记 → 地址更换 → 从节点升主"三步输出，就是第 3 节故障转移流程的现场版。
+
+## 6. 哨兵模式的局限
 
 哨兵解决了**高可用**（自动切换），但没解决：
 
@@ -95,7 +183,7 @@ replica.get("k")         # 读走从
 
 数据量大到一台机器装不下时，就需要最后一块拼图——**集群（Cluster）**。
 
-## 6. 小结
+## 7. 小结
 
 - 哨兵 = 监控 + 自动故障转移 + 客户端服务发现
 - 至少部署 **3 个**哨兵，靠**投票（quorum）**避免误判：主观下线 → 客观下线 → 选领头 → 切换

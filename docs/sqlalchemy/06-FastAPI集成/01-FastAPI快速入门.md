@@ -90,6 +90,8 @@ def create_user(data: UserCreate):
     return {"received": data.model_dump()}
 ```
 
+> ⚠️ **新手坑**：`EmailStr` 依赖第三方库 `email-validator`。裸装的 `fastapi` 不带它，第一次用到 `EmailStr` 的地方会直接报 `ImportError: email-validator is not installed, see https://github.com/JoshData/python-email-validator`。解决：`pip install email-validator`，或推荐直接 `pip install "fastapi[standard]"`（已包含）。不需要邮箱格式校验时，写普通的 `email: str` 也完全可以。
+
 客户端 POST 这样的 JSON：
 
 ```json
@@ -188,6 +190,57 @@ def delete_user(user_id: int):
 跑起来后打开 `/docs`，把四个接口都点一遍——**创建两个用户、查列表、查单个、删一个**。感受一下不写一行前端也能完整测试 API。
 
 （这个内存版的问题显而易见：重启数据全没。这正是 SQLAlchemy 登场的理由。）
+
+## 🎯 练习：自己动手写两个接口
+
+第六节的综合小练习是作者写好、带你跑的；下面两道题轮到**你**写了——都在内存版 `fake_db` 上实现，写完去 `/docs` 里自测。
+
+**练习 1：实现 PUT /users/{user_id} 全量更新**
+
+PUT 的语义是"整条替换"：客户端必须提交完整的 name 和 email，缺字段就该返回 422。写完想一想：它和 6.3 节将讲的 PATCH 有什么本质区别？
+
+<details><summary>参考答案</summary>
+
+```python
+class UserReplace(BaseModel):
+    name: str           # 必填：PUT 不传就 422，这正是"全量"的含义
+    email: str
+
+
+@app.put("/users/{user_id}", response_model=UserOut)
+def replace_user(user_id: int, data: UserReplace):
+    if user_id not in fake_db:
+        raise HTTPException(404, "用户不存在")
+    fake_db[user_id] = {"id": user_id, **data.model_dump()}   # 整条替换
+    return fake_db[user_id]
+```
+
+测试：`PUT /users/1` 提交 `{"name": "张三改", "email": "new@example.com"}` → 返回更新后的用户；只提交 `{"name": "张三改"}` → 422（email 缺失，Pydantic 自动拦下）。
+
+对比：PUT 要求字段全给、整条替换；PATCH 只传要改的字段、没传的不动（6.3 节用 `exclude_unset` 实现）。分清这两个语义，REST API 才规整。
+
+</details>
+
+**练习 2：给 GET /users 加 keyword 名字模糊筛选**
+
+`GET /users?keyword=张` 只返回名字里含"张"的用户；不传 keyword 时返回全部。
+
+<details><summary>参考答案</summary>
+
+```python
+@app.get("/users", response_model=list[UserOut])
+def list_users(keyword: str | None = None):     # 不在路径里 → 自动成为查询参数
+    users = list(fake_db.values())
+    if keyword:                                 # 传了才过滤
+        users = [u for u in users if keyword in u["name"]]
+    return users
+```
+
+测试：先创建"张三"、"李四"两个用户，访问 `/users?keyword=张` → 只有张三；访问 `/users` → 全部。
+
+要点：查询参数天然可选（默认值给 `None` 即可）；"有值才加过滤条件"正是 3.3 节动态查询思想在 Web 层的翻版——换成 SQLAlchemy 就是 `stmt = stmt.where(User.name.contains(keyword))`。
+
+</details>
 
 ## 📝 本节小结
 

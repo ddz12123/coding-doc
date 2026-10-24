@@ -9,7 +9,7 @@
 - 官网：<https://go.dev/dl/>
 - 国内镜像（官网慢时用这个）：<https://golang.google.cn/dl/>
 
-下载**最新稳定版**即可（本教程内容适用于 Go 1.21 及以上任何版本）。
+下载**最新稳定版**即可（本教程内容适用于 Go 1.22 及以上任何版本——2.4 节会用的 range 整数语法从 1.22 才有）。
 
 ### Windows
 
@@ -155,6 +155,14 @@ cd ~/go-learn
 ```
 
 用 VS Code 打开这个目录（菜单：文件 → 打开文件夹），后面的学习代码都放这里。
+
+## ✅ 安装自查
+
+进入下一节之前，动手做完这 3 项检查，全部通过说明环境就绪：
+
+1. `go version` —— 能打印出版本号，如 `go version go1.22.5 windows/amd64`
+2. `go env GOPROXY` —— 国内用户确认输出为 `https://goproxy.cn,direct`
+3. `go env GOPATH` —— 记住这个目录，以后下载的第三方库都缓存在它的 `pkg/mod` 里
 
 ---
 

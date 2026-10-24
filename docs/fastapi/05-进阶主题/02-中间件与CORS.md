@@ -112,6 +112,89 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["api.example.com"])
 ```
 
+### 用 curl 亲眼看到 Gzip 生效
+
+中间件加了不等于生效了，实测是习惯。先发几篇文章，让 `/posts` 的响应超过 `minimum_size` 的 1000 字节，然后：
+
+```bash
+# 1) 不声明支持 gzip：拿到的是原始 JSON
+curl -s http://127.0.0.1:8000/posts -o /dev/null -w "%{size_download} bytes\n"
+# 9742 bytes
+
+# 2) 请求头声明接受 gzip，-I 只看响应头
+curl -H "Accept-Encoding: gzip" -I http://127.0.0.1:8000/posts
+# HTTP/1.1 200 OK
+# content-encoding: gzip        ← 关键证据：压缩已生效
+# content-length: 1287          ← 压缩后只剩原来的一小部分
+```
+
+注意这是一场「协商」：客户端用 `Accept-Encoding: gzip` 声明自己支持，服务端才会压缩；响应小于 `minimum_size` 时也不会压（压不了几字节，白费 CPU）。浏览器发请求默认就带这个头，所以线上用户自动受益，前端一行代码都不用改。
+
+## 5. 练习
+
+### 练习 1：给所有响应加版本头
+
+写一个中间件，让每个响应都带上 `X-App-Version: 1.0.0` 响应头。提示：`call_next` 返回的就是 response 对象，可以直接改它的 `headers`。完成后用 `curl -I` 验证。
+
+<details><summary>参考答案</summary>
+
+```python
+# app/main.py
+from fastapi import Request
+
+APP_VERSION = "1.0.0"
+
+
+@app.middleware("http")
+async def add_version_header(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-App-Version"] = APP_VERSION
+    return response
+```
+
+```bash
+curl -I http://127.0.0.1:8000/
+# HTTP/1.1 200 OK
+# x-app-version: 1.0.0        ← 每个响应都带上了
+```
+
+实际用途：排查线上问题时先看这个头，就知道流量打到的是哪个版本；灰度发布新旧两套服务时，也能用它区分请求落在哪套上。
+
+</details>
+
+### 练习 2：日志中间件跳过 /docs 请求
+
+第 3 节的日志中间件会把 /docs、/openapi.json 这类文档请求也记进日志，刷屏又没有分析价值。请给它加上「文档相关请求不打日志」的逻辑，但请求本身要正常放行。提示：`request.url.path.startswith(...)`。
+
+<details><summary>参考答案</summary>
+
+```python
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    # /docs 前缀同时覆盖 /docs 和 /docs/oauth2-redirect；startswith 可传元组
+    if request.url.path.startswith(("/docs", "/openapi.json", "/redoc")):
+        return await call_next(request)   # 放行，但不记日志
+
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    logger.info(
+        "%s %s → %d (%.1fms)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed_ms,
+    )
+    return response
+```
+
+两个细节：
+
+1. 「跳过」指的是跳过**记日志**，不是拦掉请求——所以直接 `return await call_next(request)` 让它正常走完，而不是返回 404 或空响应
+2. `startswith` 接受元组参数，一条判断就能覆盖多个前缀，比写一串 `or` 干净
+
+</details>
+
 ## 本章小结
 
 - 中间件包裹所有请求，适合日志、跨域、压缩等横切逻辑

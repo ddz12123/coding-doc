@@ -40,6 +40,12 @@ docker compose up -d
 docker compose logs -f jenkins   # 观察启动日志
 ```
 
+日志刷一阵子后看到这一行，就是启动完成的「成功标志」，可以去开浏览器了（Ctrl+C 只是退出日志跟踪，不影响容器）：
+
+```text
+jenkins  | Jenkins is fully up and running
+```
+
 > 两个挂载解释一下：
 > - `jenkins_home` 是 Jenkins 的全部家当（配置、插件、任务、历史记录），挂出来后容器随便删，数据不丢
 > - `docker.sock` 让容器里的 Jenkins 可以指挥宿主机的 Docker 构建镜像，即「Docker outside of Docker」，个人和小团队最常用的玩法
@@ -54,7 +60,22 @@ docker compose logs -f jenkins   # 观察启动日志
 docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 ```
 
+输出是一长串十六进制随机密码（UUID 形式），整行复制粘贴到解锁页：
+
+```text
+$ docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+1a2b3c4d5e6f7890abcdef1234567890
+```
+
 **第 2 步：装插件。** 选「**安装推荐的插件**」，等它装完（取决于网络，可能要几分钟）。
+
+> **高频坑：插件下载慢 / 装一半失败。** 默认更新源在国外，国内服务器经常转圈甚至超时报错。把 Update Site 换成清华镜像源再装：`Manage Jenkins → Plugins → Advanced Settings → Update Site`，URL 改为
+>
+> ```text
+> https://mirrors.tuna.tsinghua.edu.cn/jenkins/updates/current/update-center.json
+> ```
+>
+> 保存（Submit）后按提示重启 Jenkins，再回来重试安装，速度会快很多。
 
 **第 3 步：创建管理员账号。** 设置自己的用户名密码，别用 admin/123456。
 

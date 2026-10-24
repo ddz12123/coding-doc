@@ -30,7 +30,7 @@ dialect+driver://username:password@host:port/database
 # 相对路径：当前目录下的 app.db（注意是三个斜杠）
 create_engine("sqlite:///app.db")
 
-# 绝对路径（Windows，四个斜杠后接盘符）
+# 绝对路径（Windows，三个斜杠后接盘符路径）
 create_engine("sqlite:///D:/data/app.db")
 
 # 内存数据库：程序退出即消失，适合测试
@@ -151,6 +151,136 @@ try:
 except Exception as e:
     print(f"❌ 连接失败: {e}")
 ```
+
+## 八、练习
+
+### 练习 1：手写 MySQL 连接字符串（动手）
+
+需求：连接 MySQL（pymysql 驱动），用户名 `root`，密码 `p@ss`（注意里面有 `@`），主机 `localhost`，端口 `3306`，库名 `shop`。请写出能正确创建 Engine 的代码。
+
+<details><summary>参考答案</summary>
+
+密码里的 `@` 和 URL 中"密码@主机"的分隔符撞车了，必须先用 `quote_plus` 编码：
+
+```python
+from urllib.parse import quote_plus
+
+from sqlalchemy import create_engine
+
+password = quote_plus("p@ss")
+print(password)   # p%40ss —— @ 被编码成 %40
+
+engine = create_engine(f"mysql+pymysql://root:{password}@localhost:3306/shop?charset=utf8mb4")
+```
+
+最终生效的连接字符串：
+
+```
+mysql+pymysql://root:p%40ss@localhost:3306/shop?charset=utf8mb4
+```
+
+如果直接把 `p@ss` 写进 URL，SQLAlchemy 会把第一个 `@` 当作"用户信息@主机"的分隔符，解析出错（把 `p` 当密码、`ss` 当主机名……），连接必然失败。
+
+</details>
+
+### 练习 2：text() 参数化查询（动手）
+
+用 `engine.connect()` + `text()` 查出 `age > 20` 的用户并逐行打印。要求：SQL 里不许出现写死的 20，也不许用 f-string。
+
+<details><summary>参考答案</summary>
+
+```python
+from sqlalchemy import create_engine, text
+
+engine = create_engine("sqlite:///:memory:")
+
+# 先造表、造数据（列表里放多个字典 = executemany 批量插入）
+with engine.begin() as conn:
+    conn.execute(text("""
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            name VARCHAR(50) NOT NULL,
+            age INTEGER NOT NULL
+        )
+    """))
+    conn.execute(
+        text("INSERT INTO users (name, age) VALUES (:name, :age)"),
+        [
+            {"name": "张三", "age": 25},
+            {"name": "李四", "age": 30},
+            {"name": "王五", "age": 17},
+        ],
+    )
+
+# 参数化查询：占位符 :min_age，值放字典里
+with engine.connect() as conn:
+    result = conn.execute(
+        text("SELECT id, name, age FROM users WHERE age > :min_age"),
+        {"min_age": 20},
+    )
+    for row in result:
+        print(row.id, row.name, row.age)
+```
+
+预期输出（17 岁的王五被过滤）：
+
+```
+1 张三 25
+2 李四 30
+```
+
+要点：占位符 `:名字` + 字典传值，SQLAlchemy 会把 20 作为**参数**安全地发给数据库，而不是拼进 SQL 文本。
+
+</details>
+
+### 练习 3：为什么严禁 f-string 拼 SQL？（说理）
+
+两种写法查的都是"名字等于用户输入"的用户，而用户输入是恶意字符串 `"' OR '1'='1"`。先预测两种写法各返回几行，再看答案。
+
+<details><summary>参考答案</summary>
+
+```python
+from sqlalchemy import create_engine, text
+
+engine = create_engine("sqlite:///:memory:")
+
+with engine.begin() as conn:
+    conn.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY, name VARCHAR(50))"))
+    conn.execute(
+        text("INSERT INTO users (name) VALUES (:name)"),
+        [{"name": "张三"}, {"name": "李四"}],
+    )
+
+user_input = "' OR '1'='1"   # 模拟恶意输入
+
+with engine.connect() as conn:
+    # ❌ f-string 拼接：输入变成了 SQL 语法的一部分
+    bad = conn.execute(text(f"SELECT * FROM users WHERE name = '{user_input}'")).all()
+    print("拼接 SQL 返回行数:", len(bad))
+
+    # ✅ 参数化：输入永远只是"数据"
+    good = conn.execute(
+        text("SELECT * FROM users WHERE name = :name"), {"name": user_input}
+    ).all()
+    print("参数化查询返回行数:", len(good))
+```
+
+预期输出：
+
+```
+拼接 SQL 返回行数: 2
+参数化查询返回行数: 0
+```
+
+原因：拼接后的 SQL 文本变成了
+
+```sql
+SELECT * FROM users WHERE name = '' OR '1'='1'
+```
+
+`'1'='1'` 恒真，WHERE 条件形同虚设，全表数据被泄露——这就是 **SQL 注入**。更恶意的输入甚至可以拼出删库语句。参数化查询把输入当成纯数据传给数据库，永远不会被当作 SQL 执行，所以老实返回 0 行（库里没人叫这个名字）。
+
+</details>
 
 ## 📝 本节小结
 

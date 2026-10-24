@@ -71,25 +71,29 @@ for u in users:
 ### 条件过滤：where
 
 ```python
+# 以下结果基于本章种子数据（第 1 节先后插入的 3 个用户）：
+#   xiaoming(id=1, age=18)   xiaohong(id=2, age=17)   xiaogang(id=3, age=20)
+#   三人的 is_active 均为默认值 True
+
 # 单条件
-stmt = select(User).where(User.age >= 18)
+stmt = select(User).where(User.age >= 18)                           # → xiaoming, xiaogang
 
 # 多条件（逗号分隔 = AND）
-stmt = select(User).where(User.age >= 18, User.is_active == True)
+stmt = select(User).where(User.age >= 18, User.is_active == True)   # → xiaoming, xiaogang（三人都是 True，等价于只看年龄）
 
 # OR 条件
 from sqlalchemy import or_
-stmt = select(User).where(or_(User.username == "xiaoming", User.age > 19))
+stmt = select(User).where(or_(User.username == "xiaoming", User.age > 19))   # → xiaoming, xiaogang（xiaoming 名字命中，xiaogang 年龄 20 > 19）
 
 # 模糊搜索（LIKE），% 是通配符
-stmt = select(User).where(User.username.like("%xiao%"))
+stmt = select(User).where(User.username.like("%xiao%"))             # → xiaoming, xiaohong, xiaogang（三个名字都含 xiao）
 
 # IN 查询
-stmt = select(User).where(User.id.in_([1, 2, 3]))
+stmt = select(User).where(User.id.in_([1, 2, 3]))                   # → xiaoming, xiaohong, xiaogang（id 全中）
 
 # 判空
-stmt = select(User).where(User.age.is_(None))       # IS NULL
-stmt = select(User).where(User.age.is_not(None))    # IS NOT NULL
+stmt = select(User).where(User.age.is_(None))       # IS NULL → 空列表（三人都填了年龄）
+stmt = select(User).where(User.age.is_not(None))    # IS NOT NULL → xiaoming, xiaohong, xiaogang
 
 users = db.scalars(stmt).all()
 ```
@@ -217,6 +221,82 @@ with SessionLocal() as db:
 | 条件查询 | `db.query(User).filter(User.age > 18)` | `select(User).where(User.age > 18)` |
 | 按主键 | `db.query(User).get(1)` | `db.get(User, 1)` |
 | 第一条 | `.first()` | `db.scalars(stmt).first()` |
+
+## 7. 练习
+
+以下练习都基于本章种子数据（xiaoming / xiaohong / xiaogang，见第 5 节演练脚本——建议先跑一遍它再做题，保证数据一致）。
+
+### 练习 1：组合查询（动手）
+
+查询年龄 ≥ 18 的用户，按**用户名升序**排列，只取前 2 条。
+
+<details>
+<summary>参考答案</summary>
+
+```python
+stmt = (
+    select(User)
+    .where(User.age >= 18)              # → xiaoming, xiaogang
+    .order_by(User.username.asc())      # 用户名升序：xiaogang 排在 xiaoming 前面
+    .limit(2)                           # 取前 2 条
+)
+for u in db.scalars(stmt).all():
+    print(u.id, u.username)
+```
+
+输出：
+
+```
+3 xiaogang
+1 xiaoming
+```
+
+要点：`where → order_by → limit` 的链式顺序是固定的——先过滤、再排序、再截断；`.asc()` 可以省略，不写方向时默认就是升序。
+
+</details>
+
+### 练习 2：条件计数（动手）
+
+统计 `is_active=True` 的用户人数。
+
+<details>
+<summary>参考答案</summary>
+
+```python
+from sqlalchemy import func
+
+count = db.scalar(
+    select(func.count())
+    .select_from(User)
+    .where(User.is_active == True)
+)
+print(count)   # → 3
+```
+
+输出 `3`（三人的 is_active 都是默认值 True）。要点：`db.scalar`（单数）执行语句后直接返回「第一行第一列」的值，取 count、max 这类单值最合适，不用再 `.all()`。
+
+</details>
+
+### 练习 3：改完再验证（动手）
+
+把 xiaohong 的邮箱改成 `xh_new@qq.com`，然后用 `db.get` 按主键重新取一次，验证修改已经落库。
+
+<details>
+<summary>参考答案</summary>
+
+```python
+xh = db.scalars(select(User).where(User.username == "xiaohong")).first()
+
+xh.email = "xh_new@qq.com"
+db.commit()                        # 不 commit 不生效！
+
+fresh = db.get(User, xh.id)        # 按主键再取一次
+print(fresh.email)                 # → xh_new@qq.com
+```
+
+输出 `xh_new@qq.com`。要点：改属性后必须 `commit`，UPDATE 语句在 commit 时才生成执行；想确认修改真的落了库，最可靠的办法是**重新查一遍**再看值。
+
+</details>
 
 ## 本章小结
 

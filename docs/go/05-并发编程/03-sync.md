@@ -173,17 +173,54 @@ func main() {
 
 ## 五、sync.Once：只执行一次（了解）
 
-典型场景：全局初始化，无论多少 goroutine 同时触发，都只执行一次：
+典型场景：全局初始化，无论多少 goroutine 同时触发，都只执行一次。完整跑一把——5 个 goroutine 同时要配置，看"加载配置"出现几次：
 
 ```go
-var once sync.Once
+package main
 
-func getConfig() {
-    once.Do(func() {
-        fmt.Println("加载配置（只会打印一次）")
-    })
+import (
+    "fmt"
+    "sync"
+)
+
+var (
+    once   sync.Once
+    config string
+)
+
+func getConfig() string {
+    once.Do(func() {           // 5 个 goroutine 同时到这，只有第一个真正执行
+        config = "数据库连接配置"
+        fmt.Println("加载配置")  // 只会打印一次
+    })                         // 其他 4 个在这等它干完，然后直接跳过
+    return config
+}
+
+func main() {
+    var wg sync.WaitGroup
+    for i := 1; i <= 5; i++ {
+        wg.Add(1)
+        go func(id int) {
+            defer wg.Done()
+            fmt.Printf("goroutine %d 拿到配置：%s\n", id, getConfig())
+        }(i)
+    }
+    wg.Wait()
 }
 ```
+
+输出（后五行顺序随机）：
+
+```text
+加载配置
+goroutine 3 拿到配置：数据库连接配置
+goroutine 1 拿到配置：数据库连接配置
+goroutine 5 拿到配置：数据库连接配置
+goroutine 2 拿到配置：数据库连接配置
+goroutine 4 拿到配置：数据库连接配置
+```
+
+"加载配置"只出现**一次**，且一定在所有"拿到配置"之前——`once.Do` 保证函数只执行一次，其他调用原地等它执行完再继续。
 
 ## 六、并发编程军规（新手版）
 
@@ -195,12 +232,15 @@ func getConfig() {
 
 ---
 
-## 新手常见坑
+## 新手常见坑（报错速查表）
 
-1. **忘记 Unlock 导致死锁**：所有人都在等锁。用 `defer mu.Unlock()` 根治
-2. **拷贝了含锁的结构体**：锁被复制后失去意义。含 Mutex 的结构体一律传指针
-3. **并发写 map 不加锁**：直接 panic，这个坑几乎人人踩过
-4. **以为 `-race` 没报错就绝对没竞争**：它只能检测**运行时实际发生**的竞争，测试覆盖不到的路径查不出来
+| 报错原文 / 现象 | 人话翻译 | 解决 / 原因 |
+|------|------|------|
+| `fatal error: concurrent map writes` | 多个 goroutine 同时写一个 map，运行时直接崩溃退出 | map 不是并发安全的：写操作用 Mutex 保护，或让单个 goroutine 独占 map |
+| `fatal error: all goroutines are asleep - deadlock!` | 忘了 Unlock（或某条路径绕过了 Unlock），所有人排队等锁 | `mu.Lock()` 下一行就写 `defer mu.Unlock()`，根治 |
+| `WARNING: DATA RACE`（`go run -race` 的输出） | 检测到两个 goroutine 在无保护地同时读写同一处内存 | 按警告指出的变量和行号，加锁或改用 channel |
+| （go vet 警告）`passes lock by value` | 含 Mutex 的结构体被**拷贝**了一份，拷贝出来的锁形同虚设 | 含锁结构体一律传指针 `&s`，方法接收者用 `func (s *SafeMap)` |
+| `-race` 没报错，上线还是偶发出错 | 它只能检测**运行时实际发生**的竞争 | 测试要真实跑并发路径；没执行到的代码它看不见 |
 
 ---
 
@@ -210,6 +250,74 @@ func getConfig() {
 2. 用 Mutex 修复它，再跑 `-race` 确认警告消失。
 3. 实现 `SafeMap` 结构体：内含 `map[string]int` 和 `sync.Mutex`，提供并发安全的 `Set(k, v)` 和 `Get(k)` 方法，开 100 个 goroutine 同时写入测试。
 4. 挑战题：用"channel + 单一计数者"方案重写练习 3。
+
+<details>
+<summary>点击查看答案</summary>
+
+**1 / 2.** 直接跑大概率能看到 WARNING，且 counter 小于 1000；加 Mutex 后 WARNING 消失、稳定输出 1000。（竞争是概率性的，多跑几次或把 goroutine 数加大更容易复现。）
+
+**3. SafeMap 参考实现：**
+
+```go
+package main
+
+import (
+    "fmt"
+    "sync"
+)
+
+type SafeMap struct {
+    mu sync.Mutex
+    m  map[string]int
+}
+
+func NewSafeMap() *SafeMap {
+    return &SafeMap{m: make(map[string]int)}
+}
+
+func (s *SafeMap) Set(k string, v int) {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    s.m[k] = v
+}
+
+func (s *SafeMap) Get(k string) int {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    return s.m[k]
+}
+
+func (s *SafeMap) Len() int {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    return len(s.m)
+}
+
+func main() {
+    sm := NewSafeMap()
+    var wg sync.WaitGroup
+    for i := 0; i < 100; i++ {
+        wg.Add(1)
+        go func(id int) {
+            defer wg.Done()
+            sm.Set(fmt.Sprintf("key-%d", id), id)
+        }(i)
+    }
+    wg.Wait()
+    fmt.Println("map 大小：", sm.Len())   // 稳定 100；不加锁会 concurrent map writes
+}
+```
+
+**4. 思路：** 让 map 只被**一个** goroutine 持有（单一保管员）。定义请求结构 `type setReq struct{ k string; v int }`，其他 goroutine 往 `ch := make(chan setReq)` 发请求；保管员 `for req := range ch { m[req.k] = req.v }`；全部发完后 `close(ch)`，保管员自然下班。只有保管员一人碰 map，天然无竞争，一把锁都不用。
+
+</details>
+
+## 本节小结
+
+- 并发读写共享变量 = 数据竞争：结果随机、难复现。`go run -race` / `go test -race` 是并发代码的必跑检查
+- Mutex 三板斧：`Lock()` → 临界区 → `defer Unlock()`；锁和数据封装进同一个结构体，含锁结构体一律传指针
+- map 不是并发安全的，并发写直接 `fatal error: concurrent map writes`
+- 选型口诀：保护共享状态用 Mutex，传递数据/任务用 channel，等一组结束用 WaitGroup
 
 ---
 

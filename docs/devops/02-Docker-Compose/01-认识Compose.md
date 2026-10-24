@@ -62,7 +62,25 @@ docker compose ps
 docker compose down
 ```
 
-注意我们**没有手动建网络**——Compose 会自动为这个项目创建一个专属网络，所有服务都在里面，服务名（`db`、`api`）直接当主机名互相访问。
+`docker compose up -d` **首次运行**的回显（假设项目目录名叫 `demo`）：
+
+```text
+[+] Running 4/4
+ ✔ Network "demo_default"     Created   0.1s
+ ✔ Volume  "demo_mysql-data"  Created   0.1s
+ ✔ Container "demo-db-1"      Started   2.4s
+ ✔ Container "demo-api-1"     Started   0.9s
+```
+
+建网络、建卷、起容器，全部由 Compose 代劳。`docker compose ps` 查看状态：
+
+```text
+NAME         IMAGE       COMMAND                  SERVICE   CREATED         STATUS          PORTS
+demo-api-1   myapi:1.0   "uvicorn main:app --…"   api       5 seconds ago   Up 4 seconds    0.0.0.0:8000->8000/tcp
+demo-db-1    mysql:8.0   "docker-entrypoint.s…"   db        7 seconds ago   Up 6 seconds    3306/tcp, 33060/tcp
+```
+
+注意我们**没有手动建网络**——Compose 会自动为这个项目创建一个专属网络（回显第一行的 `demo_default` 就是它），所有服务都在里面，服务名（`db`、`api`）直接当主机名互相访问。
 
 ## 3. 文件名与版本说明
 
@@ -149,6 +167,47 @@ services:
 ```
 
 这个写法在部署实战部分会反复用到。
+
+## 动手练习
+
+把第 05 章手动部署那套命令（建网络、建卷、`docker run` 起 db 和 api）改写成一个 `compose.yaml`，放到一个空目录里，用 `docker compose up -d` 跑起来，再用 `docker network ls` 确认 Compose 自动创建的网络。
+
+<details>
+<summary>参考答案</summary>
+
+```yaml
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped      # 顺手加上重启策略，比 05 章的手动版更进一步
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  api:
+    image: myapi:1.0
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+volumes:
+  mysql-data:
+```
+
+验证：
+
+```bash
+docker compose up -d        # 回显里能看到 网络和卷被自动创建
+docker network ls           # 多了一个 目录名_default 网络
+docker compose ps           # db、api 两个服务都是 Up
+```
+
+对比第 05 章：网络和卷不用手动建了，`--network` 参数消失了，整套配置还能直接进 Git——这就是 Compose 的价值。
+
+</details>
 
 ## 小结
 

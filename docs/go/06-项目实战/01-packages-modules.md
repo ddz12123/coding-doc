@@ -89,6 +89,23 @@ func main() {
 2. **大写公开，小写私有**：函数、变量、结构体、字段全适用。这是 Go 的访问控制机制
 3. **不允许循环导入**：A 导入 B，B 又导入 A → 编译报错。遇到了说明代码结构要调整（通常是把公共部分抽出第三个包）
 
+   最小复现——两个包互相 import：
+
+   ```
+   myapp/
+   ├── go.mod
+   ├── a/a.go    import "myapp/b"
+   └── b/b.go    import "myapp/a"
+   ```
+
+   `go build ./...` 的报错原文：
+
+   ```text
+   package myapp/a
+           imports myapp/b
+           imports myapp/a: import cycle not allowed
+   ```
+
 ## 四、import 的几种写法
 
 ```go
@@ -121,7 +138,58 @@ func init() {
 }
 ```
 
-执行顺序：被导入的包先初始化 → 然后才是 main。新手了解即可，**能不用就不用**（隐式执行的代码不好排查）。
+### 眼见为实：两文件小程序
+
+```
+myapp/
+├── go.mod          (module myapp)
+├── main.go
+└── calc/calc.go
+```
+
+```go
+// calc/calc.go
+package calc
+
+import "fmt"
+
+func init() {
+    fmt.Println("① calc 的 init 执行了")
+}
+
+func Add(a, b int) int {
+    return a + b
+}
+```
+
+```go
+// main.go
+package main
+
+import (
+    "fmt"
+
+    "myapp/calc"
+)
+
+func init() {
+    fmt.Println("② main 的 init 执行了")
+}
+
+func main() {
+    fmt.Println("③ main 函数执行了：", calc.Add(1, 2))
+}
+```
+
+`go run .` 输出：
+
+```text
+① calc 的 init 执行了
+② main 的 init 执行了
+③ main 函数执行了： 3
+```
+
+输出证明执行顺序：**被导入的包先初始化（①）→ main 自己的 init（②）→ main 函数（③）**。新手了解即可，**能不用就不用**（隐式执行的代码不好排查）。
 
 ## 六、常见项目结构
 
@@ -165,13 +233,15 @@ myapp/
 
 ---
 
-## 新手常见坑
+## 新手常见坑（报错速查表）
 
-1. **`go run main.go` 跑不起来多文件项目**：用 `go run .`
-2. **导入路径写成目录相对路径**：`import "./calc"` 是错的！必须写 `模块名/calc`
-3. **函数明明存在却 undefined**：检查首字母是否小写（未导出）
-4. **包名和目录名不一致**：能编译但极易混淆，永远保持一致
-5. **循环导入**：`import cycle not allowed`，重新划分包职责
+| 报错原文 / 现象 | 人话翻译 | 解决 / 原因 |
+|------|------|------|
+| `undefined: greet`（函数明明写了） | `go run main.go` 只编译 main.go 一个文件，同包的 helper.go 没带上 | 多文件项目用 `go run .` 跑整个包 |
+| `import "./calc"` 直接编译报错 | Go 不支持目录相对路径导入 | 导入路径 = 模块名 + 目录：`myapp/calc` |
+| `undefined: calc.helper` | 函数首字母小写，包外不可见（未导出） | 想对外公开就改成大写开头 |
+| 包名和目录名不一致 | 能编译，但 import 后用的名字和目录对不上，极易混淆 | 包名永远 = 目录名 |
+| `import cycle not allowed` | A 导入 B、B 又导入 A，转圈了 | 把公共部分抽到第三个包 |
 
 ---
 
@@ -180,5 +250,73 @@ myapp/
 1. 创建项目 `shapes`，包含 `geometry` 子包，实现 `RectArea(w, h float64)` 和 `CircleArea(r float64)`，在 main.go 中调用。
 2. 在 `geometry` 包加一个小写的辅助函数，在 main.go 里尝试调用，观察编译报错信息。
 3. 把之前章节的"银行账户"示例改造成独立的 `account` 包：`Account` 结构体、`Deposit`、`Withdraw` 公开，内部校验逻辑用小写函数。
+
+<details>
+<summary>点击查看答案</summary>
+
+**1.** 目录 `shapes/geometry/geometry.go`（`package geometry`），导出 `RectArea` 和 `CircleArea`；main.go 里 `import "shapes/geometry"` 后 `fmt.Println(geometry.RectArea(3, 4), geometry.CircleArea(1))`（记得用 `go run .`）。公式：矩形 `w*h`，圆 `math.Pi * r * r`。
+
+**2.** 在 geometry 包里写 `func helper() {}`，main.go 调用 `geometry.helper()`，真实报错：
+
+```text
+./main.go:10:26: undefined: geometry.helper
+```
+
+函数明明存在却 undefined——因为 Go 的小写 = 私有，包外根本看不见。（旧版 Go 文案是 `cannot refer to unexported name`，一个意思。）
+
+**3. 参考结构：**
+
+```go
+// account/account.go
+package account
+
+import "errors"
+
+type Account struct {
+    owner   string // 小写：外部改不了持有人
+    balance int    // 金额用"分"存整数（2.2 节的纪律）
+}
+
+func New(owner string) *Account {
+    return &Account{owner: owner}
+}
+
+func (a *Account) Deposit(amount int) error {
+    if !a.positive(amount) {
+        return errors.New("金额必须为正")
+    }
+    a.balance += amount
+    return nil
+}
+
+func (a *Account) Withdraw(amount int) error {
+    if !a.positive(amount) {
+        return errors.New("金额必须为正")
+    }
+    if amount > a.balance {
+        return errors.New("余额不足")
+    }
+    a.balance -= amount
+    return nil
+}
+
+func (a *Account) Balance() int {
+    return a.balance
+}
+
+// positive 小写：内部校验逻辑，包外不可见
+func (a *Account) positive(n int) bool {
+    return n > 0
+}
+```
+
+</details>
+
+## 本节小结
+
+- 同目录同 package = 同一个包，内部直接调用、不用 import；多文件项目用 `go run .` 跑整个包
+- 导入路径 = 模块名 + 目录；**首字母大写公开、小写私有**，Go 的访问控制全靠这一条
+- 包初始化顺序：被导入的包先 init，再轮到 main 自己；包之间不许循环导入
+- `go.mod` / `go.sum` 是依赖账本，不手编、不删除，提交 git 时一起带上
 
 下一节：[6.2 单元测试](02-testing.md)

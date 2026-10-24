@@ -29,3 +29,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# 安全扫描/智能体工具产物
+.mimosa/
+.zcode/
+*.log

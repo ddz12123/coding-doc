@@ -48,7 +48,7 @@ docker compose up -d --build --force-recreate api
 ## 3. 查看状态与日志
 
 ```bash
-# 查看各服务状态（State 列是 running / exited）
+# 查看各服务状态（STATUS 列：Up 运行中，Exited 已退出；配了 healthcheck 的服务还会带 healthy 标记）
 docker compose ps
 
 # 看全部服务的日志
@@ -62,6 +62,26 @@ docker compose logs --tail 100 api
 
 # 查看各服务资源占用
 docker compose stats
+```
+
+`docker compose ps` 的真实输出（沿用 01 章的 demo 项目）：
+
+```text
+NAME         IMAGE       COMMAND                  SERVICE   CREATED          STATUS                    PORTS
+demo-api-1   myapi:1.0   "uvicorn main:app --…"   api       36 seconds ago   Up 35 seconds             0.0.0.0:8000->8000/tcp
+demo-db-1    mysql:8.0   "docker-entrypoint.s…"   db        40 seconds ago   Up 39 seconds (healthy)   3306/tcp, 33060/tcp
+```
+
+比 `docker ps` 多一个 `SERVICE` 列；db 后面的 `(healthy)` 表示健康检查已通过（没配 healthcheck 的服务不会带这个标记）。
+
+`docker compose logs -f api` 跟踪日志的效果——每行开头是**容器名**，多个服务的日志混在一起时靠它区分，`Ctrl+C` 退出：
+
+```text
+demo-api-1  | INFO:     Started server process [1]
+demo-api-1  | INFO:     Waiting for application startup.
+demo-api-1  | INFO:     Application startup complete.
+demo-api-1  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+demo-api-1  | INFO:     192.168.65.1:52844 - "GET / HTTP/1.1" 200 OK
 ```
 
 ## 4. 在服务里执行命令
@@ -100,6 +120,25 @@ docker compose config
 docker compose config api
 ```
 
+它的输出就是**变量替换完成后的最终 YAML**。假设 `compose.yaml` 里写了 `MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}`、同目录 `.env` 里是 `DB_PASSWORD=123456`，那么 `docker compose config` 输出的片段：
+
+```yaml
+name: demo
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+    networks:
+      demo_default: null
+# ...(其余字段略)...
+networks:
+  demo_default:
+    name: demo_default
+```
+
+`${DB_PASSWORD}` 已经被替换成了 `"123456"`——如果输出里仍是 `${DB_PASSWORD}` 字面量，说明变量没有来源（`.env` 不在当前目录、变量名拼写不一致），一眼就能定位问题。
+
 写完配置先 `docker compose config` 检查一遍，能提前发现缩进错误、变量没定义等问题。
 
 ## 7. 多环境：用 -f 叠加配置文件
@@ -133,6 +172,17 @@ docker compose -p blog-test up -d
 docker compose ls
 ```
 
+`docker compose ls` 的输出——每个项目一行，容器、网络、卷都带着项目名前缀（如 `blog-api-1`、`blog_default`），同一台机器上多项目互不干扰：
+
+```text
+NAME                STATUS       CONFIG FILES
+blog                running(4)   /opt/blog/compose.yaml
+blog-test           running(4)   /opt/blog/compose.yaml
+fullstack-demo      exited(4)    /home/me/fullstack-demo/compose.yaml
+```
+
+上面正是 `-p` 的用法效果：同一份 `/opt/blog/compose.yaml` 起了 `blog` 和 `blog-test` 两套互不影响的环境；`STATUS` 里的数字是该项目中的容器数。
+
 ## 9. 命令速查表
 
 | 场景 | 命令 |
@@ -146,6 +196,25 @@ docker compose ls
 | 进容器 | `docker compose exec 服务名 bash` |
 | 一次性命令 | `docker compose run --rm 服务名 命令` |
 | 检查配置 | `docker compose config` |
+
+## 动手练习
+
+把 [04 篇的全栈项目](04-Compose全栈实战.md) `docker compose down` 掉，再 `docker compose up -d` 重新拉起，用 `ps` 和 `logs -f` 确认整套服务恢复如常。注意 `down` 不带 `-v`，数据卷保留，MySQL / Redis 里的数据不会丢。
+
+<details>
+<summary>参考答案</summary>
+
+```bash
+cd fullstack-demo          # 进入 compose.yaml 所在目录
+docker compose down        # 容器和网络被删除，卷保留
+docker compose up -d       # 重新创建并启动全部服务
+docker compose ps          # 四个服务（nginx/api/mysql/redis）STATUS 都是 Up
+docker compose logs -f api # 看到 uvicorn 的启动日志说明 api 已恢复，Ctrl+C 退出
+```
+
+再点几次页面按钮，然后 `docker compose exec redis redis-cli get visit_count`——次数在 down 之前的基础上继续增长，说明数据确实没丢，`down` 只动容器不动数据。
+
+</details>
 
 ## 小结
 

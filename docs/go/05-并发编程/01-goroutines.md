@@ -19,6 +19,7 @@ goroutine 是 Go 运行时管理的**轻量级线程**：
 
 - 创建成本极低（初始栈仅 2KB，系统线程要 1~8MB）
 - 一台普通电脑轻松跑**几十万个** goroutine
+- 切换由 Go 运行时在**用户态**调度完成，不用陷入内核，比线程切换便宜得多
 - 语法简单到离谱：函数调用前加个 `go`
 
 ```go
@@ -190,12 +191,15 @@ for i := 0; i < 3; i++ {
 
 ---
 
-## 新手常见坑
+## 新手常见坑（报错速查表）
 
-1. **main 退出导致 goroutine 没跑完**：用 WaitGroup 等待，别用 Sleep 碰运气
-2. **WaitGroup 传值不传指针**：`worker(i, wg)` 传的是拷贝，Done 减的是拷贝的计数，Wait 永远等不到 → 死锁。必须传 `&wg`
-3. **Add 写在 goroutine 里面**：可能 Wait 先执行时计数还是 0 直接通过。`Add` 必须在 `go` 语句**之前**调用
-4. **以为 goroutine 按启动顺序执行**：执行顺序由调度器决定，完全随机，不要依赖顺序
+| 报错原文 / 现象 | 人话翻译 | 解决 / 原因 |
+|------|------|------|
+| `fatal error: all goroutines are asleep - deadlock!` | 所有 goroutine 都睡着了，程序卡死被强制终止 | 等一个永远等不到的事。头号原因：WaitGroup 传值不传指针——Done 减的是拷贝的计数，Wait 永不归零。必须传 `&wg` |
+| 程序直接结束，goroutine 一个字都没输出 | main 跑完退出，其他 goroutine 全体陪葬 | 用 WaitGroup 的 `Wait()` 等齐再退出，别用 Sleep 碰运气 |
+| `wg.Wait()` 提前放行，任务明明没跑完 | `Add` 写在了 goroutine 里面，Wait 先执行时计数还是 0，直接通过 | `wg.Add(1)` 必须在 `go` 语句**之前**调用 |
+| 每次运行输出顺序都不一样 | 正常现象！执行顺序由调度器随机决定 | 不要依赖 goroutine 的执行顺序，需要顺序就用下一节的 channel 编排 |
+| （go vet 警告）`... passes lock by value: sync.WaitGroup contains sync.noCopy` | WaitGroup 被整个拷贝了一份传进函数，拷贝的计数加减无效 | 含锁/WaitGroup 的东西一律传指针；`go vet ./...` 能提前抓出来 |
 
 ---
 
@@ -204,5 +208,54 @@ for i := 0; i < 3; i++ {
 1. 启动 3 个 goroutine 分别打印自己的编号，用 WaitGroup 等待全部完成后打印"结束"。
 2. 写函数模拟煮饭（2 秒）和炒菜（1 秒），先串行执行统计耗时，再改成并发执行统计耗时，对比结果。
 3. 故意把 `go worker(i, &wg)` 改成传值 `wg`（需要相应改函数签名），运行观察 `fatal error: all goroutines are asleep - deadlock!` 报错——认识死锁长什么样。
+
+<details>
+<summary>点击查看答案</summary>
+
+**1. WaitGroup 三步口诀落地：**
+
+```go
+package main
+
+import (
+    "fmt"
+    "sync"
+)
+
+func main() {
+    var wg sync.WaitGroup
+
+    for i := 1; i <= 3; i++ {
+        wg.Add(1)               // ① 启动前：计数加 1
+        go func(id int) {
+            defer wg.Done()     // ② goroutine 里：干完活计数减 1
+            fmt.Println("我是", id, "号")
+        }(i)
+    }
+
+    wg.Wait()                   // ③ 主流程：等计数归零
+    fmt.Println("结束")
+}
+```
+
+**2.** 串行：2s + 1s ≈ 3 秒；并发：≈ 2 秒——总耗时取决于**最慢**的那个任务，和烧水+切菜一个道理。用 `start := time.Now()` 记开始时间，`time.Since(start)` 打印耗时即可。
+
+**3.** 传值后，`worker` 拿到的是 wg 的一份**拷贝**：`Done` 减的是拷贝的计数，原版 wg 永远停在 3，`Wait` 永不归零，main 卡死——于是看到：
+
+```text
+fatal error: all goroutines are asleep - deadlock!
+```
+
+其实不用真跑到死锁，`go vet` 就能提前发现，它会警告 `worker passes lock by value: sync.WaitGroup contains sync.noCopy`。记住结论：**WaitGroup 一律传指针 `&wg`**。
+
+</details>
+
+## 本节小结
+
+- goroutine 轻到离谱（2KB 起步、用户态调度），`go 函数()` 就能启动；但 main 一退出全体陪葬，必须有"等待"手段
+- 等待用 WaitGroup 三步口诀：启动前 `Add(1)`、里面 `defer Done()`、外面 `Wait()`；**必须传指针 `&wg`**
+- 循环里起 goroutine：Go 1.22+ 引用循环变量已安全；老代码把变量当参数传进去最稳
+
+光会"同时跑"还不够，下一节让 goroutine 学会互相传话。
 
 下一节：[5.2 channel 通道](02-channels.md)

@@ -199,6 +199,117 @@ with Session(engine) as session, session.begin():
                                 └── 出异常 → rollback → 关闭 session
 ```
 
+## 九、练习（先猜再跑）
+
+以下三题都是**预测题**：先写下你的答案，再运行代码验证。三题共用下面的准备代码：
+
+```python
+from sqlalchemy import String, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
+
+
+engine = create_engine("sqlite:///:memory:")
+Base.metadata.create_all(engine)
+```
+
+### 练习 1：flush 之后 rollback
+
+`flush()` 之后对象拿到了 `id=1`，接着马上 `rollback()`。问：这时数据库里到底有没有这行数据？
+
+<details><summary>参考答案</summary>
+
+**没有。** flush 只是把 INSERT 发给数据库执行、让对象提前拿到自增 id，但**事务并没有提交**；rollback 会把整个未提交的事务连同这条 INSERT 一起撤销。验证（新开一个 session 去查）：
+
+```python
+with Session(engine) as session:
+    user = User(name="张三")
+    session.add(user)
+    session.flush()
+    print("flush 后拿到的 id:", user.id)   # 1 —— id 是真拿到了
+    session.rollback()
+
+with Session(engine) as session:          # 新开 session 查证
+    print("rollback 后再查:", session.get(User, 1))
+```
+
+预期输出：
+
+```
+flush 后拿到的 id: 1
+rollback 后再查: None
+```
+
+</details>
+
+### 练习 2：改了属性不 commit
+
+查出 id=1 的用户，把 `name` 改成 "李四"，然后**不 commit 直接让 with 块结束**。问：数据库里这行更新了吗？
+
+<details><summary>参考答案</summary>
+
+**没有更新，还是"张三"。** 改属性只是 Session 在"记账本"上记了一笔，只有 `commit()` 才会把 UPDATE 发给数据库；带着未提交的改动关闭 session，等于把账本扔了（等效回滚）。验证：
+
+```python
+# 先准备一条数据
+with Session(engine) as session:
+    session.add(User(name="张三"))
+    session.commit()
+
+# 改属性但不 commit
+with Session(engine) as session:
+    user = session.get(User, 1)
+    user.name = "李四"        # 只改了内存里的对象
+
+# with 结束，session 已关闭。重新查证：
+with Session(engine) as session:
+    print("数据库里的名字:", session.get(User, 1).name)
+```
+
+预期输出：
+
+```
+数据库里的名字: 张三
+```
+
+</details>
+
+### 练习 3：get 两次，几条 SQL？
+
+在**同一个 session** 里连续 `session.get(User, 1)` 两次，echo 日志里会出现几条 `SELECT`？
+
+<details><summary>参考答案</summary>
+
+**1 条。** 第二次 `get` 命中了 Session 的 **Identity Map** 缓存：同一会话里同一行数据永远只对应同一个 Python 对象，`get` 发现对象已在内存中就直接返回，不再发 SQL。验证：把准备代码里的 engine 改成 `create_engine("sqlite:///:memory:", echo=True)`，先插入一条数据，再运行：
+
+```python
+with Session(engine) as session:
+    a = session.get(User, 1)   # ← 日志里唯一的 SELECT
+    b = session.get(User, 1)   # ← 不发 SQL，直接命中缓存
+    print(a is b)
+```
+
+预期输出（建表、插入的日志已省略）：
+
+```
+SELECT users.id, users.name FROM users WHERE users.id = ?
+True
+```
+
+`a is b` 是 `True`——不是"两个相等的对象"，而是**同一个对象**，这是 Identity Map 最直接的证据。注意：缓存的范围是**单个 Session**，换个新 session 再 get，还是会发 SELECT。
+
+</details>
+
 ## 📝 本节小结
 
 - Session = 购物车 + 记账本：`add`/属性修改只是登记，`commit` 才落库

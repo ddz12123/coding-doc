@@ -126,7 +126,41 @@ Dockerfile 的每条指令会生成一「层」，Docker 会缓存每一层。**
 - 只改代码重新构建：依赖安装那层直接命中缓存，几秒钟构建完
 - 如果写成先 `COPY . .` 再装依赖：每次改一行代码都要重新装一遍所有依赖
 
-这是 Dockerfile 最重要的优化技巧。
+眼见为实。用第 3 节的 FastAPI 项目构建两次：
+
+**第一次构建**，所有层都要执行，`pip install` 那层真的在下载安装，耗时接近一分钟：
+
+```text
+$ docker build -t myapi:1.0 .
+[+] Building 58.3s (11/11) FINISHED
+ => [internal] load build definition (Dockerfile)
+ => [1/5] FROM docker.io/library/python:3.12-slim
+ => [2/5] WORKDIR /app
+ => [3/5] COPY requirements.txt .
+ => [4/5] RUN pip install --no-cache-dir -r requirements.txt   32.1s
+ => [5/5] COPY . .
+ => exporting to image
+ => => naming to docker.io/library/myapi:1.0
+```
+
+然后只改一行 `main.py`，**再构建一次**：依赖层前面没有任何变化，直接命中缓存：
+
+```text
+$ docker build -t myapi:1.0 .
+[+] Building 2.4s (11/11) FINISHED
+ => [internal] load build definition (Dockerfile)
+ => [1/5] FROM docker.io/library/python:3.12-slim
+ => [2/5] WORKDIR /app
+ => [3/5] COPY requirements.txt .
+ => CACHED [4/5] RUN pip install --no-cache-dir -r requirements.txt
+ => [5/5] COPY . .
+ => exporting to image
+ => => naming to docker.io/library/myapi:1.0
+```
+
+对比关键行：第一次是 `=> [4/5] RUN pip install ... 32.1s`（真跑了 32 秒），第二次变成 `=> CACHED [4/5] RUN pip install ...`（0 秒，直接复用）。整个构建从一分钟缩短到两秒——这就是 Dockerfile 最重要的优化技巧。
+
+反过来想也一样：如果要求你改 `requirements.txt` 里任何一个字符，第 4 层缓存立即失效，它后面所有层（包括 `COPY . .`）都会重跑。
 
 ## 5. .dockerignore：别把垃圾打进镜像
 
@@ -184,6 +218,73 @@ docker tag myapi:1.2.0 registry.example.com/team/myapi:1.2.0
 # 推送到仓库
 docker push registry.example.com/team/myapi:1.2.0
 ```
+
+推送也按层进行，回显里能看到每一层的进度；仓库里已有的层会显示 `Layer already exists`，秒过：
+
+```text
+The push refers to repository [registry.example.com/team/myapi]
+d4f1a2b3c4d5: Pushed
+e5a6b7c8d9e0: Pushed
+f0a1b2c3d4e5: Layer already exists
+a1b2c3d4e5f6: Layer already exists
+1.2.0: digest: sha256:8b3f1c2d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1 size: 1163
+```
+
+最后一行的 `digest` 是镜像内容的指纹：别人拉取这个镜像时看到的 digest 与这里一致，就说明拿到的是同一份镜像。
+
+## 动手练习
+
+把一个最简 Flask 应用打包成镜像并跑通。要求：`app.py` 只有一个路由、返回一句话；依赖和代码分开复制（用上构建缓存）；构建后运行容器，用 `curl` 验证返回内容。
+
+<details>
+<summary>参考答案</summary>
+
+`app.py`：
+
+```python
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.get("/")
+def index():
+    return "Hello Flask in Docker"
+```
+
+`requirements.txt`：
+
+```text
+flask==3.0.3
+```
+
+`Dockerfile`（结构和第 3 节的 FastAPI 完全一致：先复制依赖清单装依赖，再复制代码）：
+
+```dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 5000
+CMD ["flask", "run", "--host", "0.0.0.0", "--port", "5000"]
+```
+
+构建并验证：
+
+```bash
+docker build -t myflask:1.0 .
+docker run -d --name myflask -p 5000:5000 myflask:1.0
+curl http://localhost:5000
+# Hello Flask in Docker
+```
+
+注意 `--host 0.0.0.0` 是传给 `flask run` 的参数——和第 3 节 uvicorn 是同一个坑，漏了它 curl 会连不上。
+
+</details>
 
 ## 小结
 

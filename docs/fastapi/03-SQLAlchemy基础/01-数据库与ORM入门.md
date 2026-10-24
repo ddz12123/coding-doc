@@ -130,6 +130,78 @@ SQLAlchemy 分为两层，初学者容易被网上新旧教程混淆，这里说
 
 学完后第四部分再把它装进 FastAPI。
 
+## 7. 概念自查练习
+
+### 练习 1：找痛点（改错）
+
+下面是一段用 sqlite3 标准库（不用 ORM）查询用户的代码：
+
+```python
+import sqlite3
+
+conn = sqlite3.connect("app.db")
+rows = conn.execute("SELECT * FROM users").fetchall()
+print(rows[0][1])   # 想打印第一个用户的用户名
+```
+
+对照本章第 4 节，指出这段代码的**两个痛点**，并分别说明 ORM 是怎么解决的。
+
+<details>
+<summary>参考答案</summary>
+
+1. **下标取字段，极易出错**：`rows[0][1]` 里的 `1` 表示 username 列。一旦 SELECT 的列顺序变了、或中间插入新列，下标含义就悄悄变了，而且光看代码完全不知道 `1` 是哪个字段。ORM 的解法：查询结果直接是对象，`user.username` 按属性名访问，编辑器还能自动补全。
+2. **手写 SQL 字符串，有注入风险**：SQL 以字符串形式写在 Python 里，一旦把用户输入拼接进字符串（如 `f"... WHERE name = '{name}'"`）就会造成 SQL 注入。ORM 的解法：用 `select(User).where(User.age > 18)` 这样的表达式构建查询，条件总是被安全转义。
+
+</details>
+
+### 练习 2：外键还是主键（思考）
+
+电商数据库里有一张订单明细表：
+
+**order_items 表**
+
+| id | order_id | user_id | quantity |
+|----|----------|---------|----------|
+| 1  | 100      | 7       | 2        |
+
+这张表里 `id`、`order_id`、`user_id` 各是主键还是外键？判断依据是什么？
+
+<details>
+<summary>参考答案</summary>
+
+- `id` 是**主键**：唯一标识 order_items 表里的每一行，本身没有业务含义
+- `order_id` 是**外键**：指向 orders 表的主键，表示「这行明细属于哪个订单」
+- `user_id` 也是**外键**：指向 users 表的主键，表示「这行明细属于哪个用户（下单人）」
+
+判断依据：**主键标识本表的一行，外键指向另一张表的主键、表达归属关系**。一张表只能有一个主键，但可以有多个外键。另外注意：字段叫不叫 `xxx_id` 不是判断依据，关键看它指向谁。
+
+</details>
+
+### 练习 3：CRUD 连线（概念）
+
+把左边的操作和右边对应的 SQL 语句连起来（右边顺序已打乱）：
+
+```
+Create（增）  ·  ·  DELETE
+Read（读）    ·  ·  INSERT
+Update（改）  ·  ·  SELECT
+Delete（删）  ·  ·  UPDATE
+```
+
+<details>
+<summary>参考答案</summary>
+
+```
+Create（增）→ INSERT   （INSERT INTO users ... 插入新行）
+Read（读）  → SELECT   （SELECT * FROM users ... 查询行）
+Update（改）→ UPDATE   （UPDATE users SET ... 修改已有行）
+Delete（删）→ DELETE   （DELETE FROM users ... 删除行）
+```
+
+记忆窍门：四个 SQL 关键字各司其职，正好覆盖 CRUD 的四件事——**C**reate 对应 INSERT、**R**ead 对应 SELECT、**U**pdate 对应 UPDATE、**D**elete 对应 DELETE。
+
+</details>
+
 ## 本章小结
 
 - 数据库负责持久化数据；关系型数据库以表存储，靠外键建立关联

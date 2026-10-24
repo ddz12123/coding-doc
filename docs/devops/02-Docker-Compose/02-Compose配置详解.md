@@ -224,6 +224,51 @@ volumes:
   mysql-data:
 ```
 
+## 动手练习
+
+给第 01 章的 `compose.yaml` 做三个升级：① 两个服务都加 `restart: unless-stopped`；② 给 api 加日志限额 `max-size: 10m`；③ db 的 root 密码改从 `.env` 注入，不再明文写在 YAML 里。改完用 `docker compose config` 验证变量替换是否生效。
+
+<details>
+<summary>参考答案（关键片段）</summary>
+
+`compose.yaml`：
+
+```yaml
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+
+  api:
+    image: myapi:1.0
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+```
+
+`.env`（和 compose.yaml 放同一目录，记得加进 `.gitignore`）：
+
+```text
+DB_PASSWORD=123456
+```
+
+验证变量替换：
+
+```bash
+docker compose config | grep MYSQL_ROOT_PASSWORD
+# MYSQL_ROOT_PASSWORD: 123456    ← ${DB_PASSWORD} 已被替换成 .env 里的实际值
+```
+
+如果输出里仍然是 `${DB_PASSWORD}`，说明 `.env` 不在当前目录或变量名拼写不一致。
+
+</details>
+
 ## 小结
 
 - `image` 用现成镜像，`build` 从 Dockerfile 构建

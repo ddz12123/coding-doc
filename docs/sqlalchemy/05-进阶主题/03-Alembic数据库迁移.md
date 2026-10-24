@@ -68,11 +68,15 @@ target_metadata = Base.metadata
 ```bash
 # ① 改完 models.py 后，自动生成迁移脚本
 alembic revision --autogenerate -m "add phone to users"
+# INFO  [alembic.autogenerate.compare] Detected added column 'users.phone'
+#   Generating alembic/versions/d4e5f6a7b8c9_add_phone_to_users.py ... done
 
 # ② 打开 versions/ 下新生成的脚本，人工检查一遍（重要！）
 
 # ③ 执行迁移，应用到数据库
 alembic upgrade head
+# INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+# INFO  [alembic.runtime.migration] Running upgrade a1b2c3d4e5f6 -> d4e5f6a7b8c9, add phone to users
 ```
 
 ### 走一遍完整例子
@@ -87,7 +91,14 @@ class User(Base):
     phone: Mapped[Optional[str]] = mapped_column(String(20))    # ← 新加的
 ```
 
-执行 `alembic revision --autogenerate -m "add phone to users"`，Alembic 对比后在 `versions/` 生成脚本：
+执行 `alembic revision --autogenerate -m "add phone to users"`，终端先告诉你它检测到了什么、脚本生成在哪：
+
+```text
+INFO  [alembic.autogenerate.compare] Detected added column 'users.phone'
+  Generating /path/to/project/alembic/versions/d4e5f6a7b8c9_add_phone_to_users.py ... done
+```
+
+Alembic 对比后在 `versions/` 生成脚本：
 
 ```python
 """add phone to users
@@ -110,7 +121,7 @@ def downgrade() -> None:
 - `upgrade()`：向前升级做什么
 - `downgrade()`：回滚时怎么撤销
 
-执行 `alembic upgrade head` → 数据库里的 users 表就多了 phone 列，**已有数据一行不丢**。
+执行 `alembic upgrade head`，终端打印版本链前进的一行（就是上面 bash 块里那两行 INFO，版本号从 `a1b2c3d4e5f6` 前进到 `d4e5f6a7b8c9`）——数据库里的 users 表就多了 phone 列，**已有数据一行不丢**。
 
 ## 四、常用命令速查
 
@@ -156,6 +167,94 @@ alembic history                             # 查看版本链
 - 拉到同事的新迁移后，本地跑 `alembic upgrade head` 同步
 - 部署流程标配：发布新代码前先跑 `alembic upgrade head`
 - 两人同时生成迁移会产生分叉，用 `alembic merge` 合并（遇到再查文档）
+
+## 🎯 练习
+
+> 以下练习在第三节"add phone"迁移已完成的基础上进行（当前 head 为 `d4e5f6a7b8c9`）。如果你机器上的版本号不同，属正常——autogenerate 生成的 ID 是随机的，一切以 `alembic current` 的实际输出为准。
+
+**练习 1：给 users 加 age 字段，走完"autogenerate → 检查 → upgrade"全流程**
+
+在 User 模型加一个可空的 `age` 字段，生成迁移、人工检查、应用；最后用 `PRAGMA table_info` 确认列真的存在、旧数据还在。
+
+<details><summary>参考答案</summary>
+
+① 模型加字段（models.py）：
+
+```python
+from typing import Optional
+# ...User 类里新增一行：
+age: Mapped[Optional[int]]
+```
+
+② 生成迁移脚本：
+
+```bash
+alembic revision --autogenerate -m "add age to users"
+# INFO  [alembic.autogenerate.compare] Detected added column 'users.age'
+#   Generating alembic/versions/e7f8a9b0c1d2_add_age_to_users.py ... done
+```
+
+③ 打开生成的脚本人工检查（关键行应该是 add_column，而不是 drop_column）：
+
+```python
+def upgrade() -> None:
+    op.add_column("users", sa.Column("age", sa.Integer(), nullable=True))
+```
+
+④ 应用，并验证列已存在：
+
+```bash
+alembic upgrade head
+# INFO  [alembic.runtime.migration] Running upgrade d4e5f6a7b8c9 -> e7f8a9b0c1d2, add age to users
+```
+
+```python
+import sqlite3
+
+with sqlite3.connect("app.db") as conn:
+    print([row[1] for row in conn.execute("PRAGMA table_info(users)")])
+```
+
+预期输出（age 在列，原有数据不动；用 DB Browser 打开看一眼也一样）：
+
+```text
+['id', 'name', 'phone', 'age']
+```
+
+</details>
+
+**练习 2：downgrade -1 体验回滚**
+
+把练习 1 的迁移回滚掉：观察 `alembic current` 版本号的变化、age 列的消失，再升回去。
+
+<details><summary>参考答案</summary>
+
+```bash
+# 回滚前：当前版本是 head（练习 1 生成的 e7f8a9b0c1d2）
+alembic current
+# e7f8a9b0c1d2 (head)
+
+# 回滚一级：执行脚本里 downgrade() 的 op.drop_column
+alembic downgrade -1
+# INFO  [alembic.runtime.migration] Running downgrade e7f8a9b0c1d2 -> d4e5f6a7b8c9, add age to users
+
+# 回滚后：版本号退回上一个迁移，它成了新的 head
+alembic current
+# d4e5f6a7b8c9 (head)
+```
+
+此时再用练习 1 的 `PRAGMA table_info(users)` 检查：age 列没了，回到 `['id', 'name', 'phone']`。
+
+想升回去随时可以——这就是"数据库界的 Git"：
+
+```bash
+alembic upgrade head
+# INFO  [alembic.runtime.migration] Running upgrade d4e5f6a7b8c9 -> e7f8a9b0c1d2, add age to users
+```
+
+版本号变化的本质：Alembic 把当前版本记在数据库的 `alembic_version` 表里，`current` 读它，`upgrade` / `downgrade` 沿版本链移动它。
+
+</details>
 
 ## 📝 本节小结
 
