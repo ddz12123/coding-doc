@@ -75,20 +75,34 @@ sidebar_position: 0
 | [6.3 常用标准库速览](06-项目实战/03-stdlib.md) | fmt / strings / strconv / time / os / json |
 | [6.4 实战项目：命令行待办清单](06-项目实战/04-project-todo-cli.md) | 综合运用所学，完成一个真实小项目 |
 
+### 第七章：GORM 数据库操作（07-GORM数据库操作）
+
+| 文件 | 内容 |
+|------|------|
+| [7.1 认识 GORM 与连接数据库](07-GORM数据库操作/01-gorm-intro.md) | ORM 概念、安装连接 MySQL、定义模型、自动建表 |
+| [7.2 插入数据](07-GORM数据库操作/02-create.md) | Create 单条/批量、字段控制、主键回填、Upsert |
+| [7.3 查询基础](07-GORM数据库操作/03-query-basic.md) | First/Find、Where 条件、零值坑、查不到的处理 |
+| [7.4 查询进阶](07-GORM数据库操作/04-query-advanced.md) | 排序分页、Count/Pluck/Scan、分组聚合、子查询 |
+| [7.5 更新与删除](07-GORM数据库操作/05-update-delete.md) | Update/Updates/Save、零值更新坑、软删除 |
+| [7.6 事务](07-GORM数据库操作/06-transaction.md) | 闭包事务、手动事务、SavePoint |
+| [7.7 关联操作](07-GORM数据库操作/07-associations.md) | 多对多声明、Preload、Association、Joins |
+| [7.8 原生 SQL 与调试](07-GORM数据库操作/08-raw-sql-debug.md) | Raw/Exec、错误处理、Hooks、Scope、调试与速查表 |
+
 ## 学习路线建议
 
 ```
 第一章（半天）→ 第二章（1~2 天）→ 第三章（1~2 天）
-      → 第四章（2 天）→ 第五章（2 天）→ 第六章（2~3 天）
+      → 第四章（2 天）→ 第五章（2 天）→ 第六章（2~3 天）→ 第七章 GORM（2~3 天）
 ```
 
-零基础大约 **10~14 天**可以完整学完；有其他语言经验的话 **一周左右**足够。
+零基础大约 **12~17 天**可以完整学完；有其他语言经验的话 **一周半左右**足够。
 
 ## 学完之后去哪里？
 
 - 官方教程 [A Tour of Go](https://go.dev/tour/)（可作复习）
 - 官方文档 [go.dev/doc](https://go.dev/doc/)
 - [Go by Example](https://gobyexample.com/)（大量小示例）
+- [GORM 官方中文文档](https://gorm.io/zh_CN/docs/)（第七章的完整手册）
 - 开始写你自己的项目 —— 这是最有效的学习方式
 
 祝学习顺利！Let's Go! 🚀

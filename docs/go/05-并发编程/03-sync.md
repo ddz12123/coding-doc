@@ -2,9 +2,9 @@
 
 > 本节目标：认识数据竞争问题，掌握 Mutex 互斥锁，了解竞态检测工具 -race。
 
-## 一、并发不是免费的：数据竞争
+## 一、问题现场：1000 次自增，结果不到 1000
 
-多个 goroutine **同时读写同一个变量**会出大问题。看这个"惊悚"示例：
+多个 goroutine **同时读写同一个变量**，结果会出错：
 
 ```go
 package main
@@ -28,28 +28,34 @@ func main() {
     }
 
     wg.Wait()
-    fmt.Println(counter)    // 期望 1000，实际可能是 947、982……每次都不一样！
+    fmt.Println(counter)    // 期望 1000，实际可能是 947、982……每次都不一样
 }
 ```
 
-### 为什么会少？
+### 原因：counter++ 不是一步，是三步
 
-`counter++` 看着是一步，实际是三步：**读取 → 加 1 → 写回**。
-
-两个 goroutine 同时执行时可能交错：
+`counter++` 看着是一步，实际分三步：**读取 → 加 1 → 写回**。两个 goroutine 同时执行时可能交错：
 
 ```
 goroutine A：读到 5
-goroutine B：读到 5        ← 也读到 5！
+goroutine B：读到 5        ← 也读到 5，A 的写回还没发生
 goroutine A：写回 6
-goroutine B：写回 6        ← 覆盖了 A 的结果，两次 ++ 只加了 1
+goroutine B：写回 6        ← 覆盖了 A 的结果：两次 ++ 只加了 1
 ```
 
-这就是**数据竞争（data race）**——并发编程最阴险的 bug：不一定每次出现、难以复现、后果诡异。
+### 这种问题叫数据竞争
 
-## 二、竞态检测器：-race
+**数据竞争（data race）：多个 goroutine 同时读写同一个变量，且没有任何保护。**
 
-Go 自带神器，运行时加 `-race` 参数就能自动检测数据竞争：
+| 特点 | 说明 |
+|------|------|
+| 不一定每次出现 | 是否出错取决于调度时机 |
+| 难以复现 | 测试通过不代表没有问题 |
+| 后果隐蔽 | 程序不崩溃，只是结果错误 |
+
+## 二、检测工具：-race
+
+Go 内置竞态检测器，运行时加 `-race` 参数即可自动检测数据竞争：
 
 ```bash
 go run -race main.go
@@ -67,11 +73,35 @@ Previous write at 0x00c00001c0a8 by goroutine 7:
 ==================
 ```
 
-**养成习惯：写了并发代码，就用 `-race` 跑一遍测试。**
+**规则：写了并发代码，就用 `-race` 跑一遍测试。**
 
-## 三、解决方案 1：Mutex 互斥锁
+## 三、方案一：Mutex 互斥锁
 
-`sync.Mutex`（互斥锁）保证同一时刻**只有一个 goroutine** 能进入临界区：
+**Mutex（互斥锁）：同一时刻只放一个 goroutine 进门的锁**。像公共卫生间的门锁——进去锁门（Lock），出来开锁（Unlock），其他人在门口排队。
+
+### 拆解一下 Lock / Unlock 配对
+
+```
+mu.Lock()
+   ↑
+   上锁：锁没人占就立刻拿到手；被占了就在这一行排队等
+
+counter++      ← 临界区：Lock 和 Unlock 之间的代码，同一时刻只有一个 goroutine 能执行
+
+mu.Unlock()
+   ↑
+   解锁：放行排队的下一个人
+```
+
+读作：**进门前上锁、出门后开锁——Lock 和 Unlock 之间的代码，一次只放一个 goroutine 进来**。
+
+| 方法 | 作用 |
+|------|------|
+| `mu.Lock()` | 上锁；锁被占用则排队等待 |
+| `mu.Unlock()` | 解锁，放行下一个 |
+| `defer mu.Unlock()` | 标准写法：任何退出路径都会解锁 |
+
+### 用 Mutex 修复计数器
 
 ```go
 package main
@@ -101,9 +131,7 @@ func main() {
 }
 ```
 
-类比：公共卫生间——进去锁门（Lock），出来开锁（Unlock），其他人门口排队。
-
-### 惯用封装：锁和数据放一个结构体
+### 惯用封装：锁和数据放进同一个结构体
 
 ```go
 type SafeCounter struct {
@@ -124,13 +152,16 @@ func (c *SafeCounter) Value() int {
 }
 ```
 
-`defer mu.Unlock()` 是标准写法——保证无论如何都会解锁。
+### 注意点
 
-> 进阶：读多写少的场景有 `sync.RWMutex`（读写锁，允许多个读者同时进），新手知道存在即可。
+> ⚠️ `mu.Lock()` 的下一行就写 `defer mu.Unlock()`——任何一条路径忘了 Unlock，后面所有 goroutine 都会排队等锁，全程序死锁。
 
-## 四、解决方案 2：用 channel 代替共享变量
+- 含锁的结构体**一律传指针**：传值会拷贝出一个无效的锁
+- 进阶：读多写少的场景有 `sync.RWMutex`（读写锁，允许多个读者同时进入），了解存在即可
 
-Go 风格的解法——让计数工作只由**一个** goroutine 负责，其他人通过 channel 通知它：
+## 四、方案二：channel，把变量圈给一个 goroutine
+
+Go 风格的另一种解法：让计数工作只由**一个** goroutine 负责，其他 goroutine 只通过 channel 发通知，不碰共享变量。
 
 ```go
 func main() {
@@ -161,7 +192,7 @@ func main() {
 }
 ```
 
-### Mutex 还是 channel？
+### 选型：Mutex 还是 channel
 
 | 场景 | 建议 |
 |------|------|
@@ -169,11 +200,24 @@ func main() {
 | 传递数据、任务分发、结果收集 | channel |
 | 等一组 goroutine 结束 | WaitGroup |
 
-不必教条。Go 官方的说法是：**哪个更简单清晰用哪个。**
+不必教条，Go 官方的建议是：**哪个更简单清晰就用哪个**。
 
-## 五、sync.Once：只执行一次（了解）
+## 五、sync.Once：只执行一次
 
-典型场景：全局初始化，无论多少 goroutine 同时触发，都只执行一次。完整跑一把——5 个 goroutine 同时要配置，看"加载配置"出现几次：
+### 拆解一下
+
+```
+once.Do(func() { … })
+     ↑
+     Do——执行：第一个调用的 goroutine 真正跑函数体，
+     其余 goroutine 在这一行原地等它跑完，然后直接跳过
+```
+
+读作：**无论多少个 goroutine 同时调用，函数都只执行一次**。
+
+### 例子
+
+5 个 goroutine 同时获取配置，观察"加载配置"打印几次：
 
 ```go
 package main
@@ -220,7 +264,12 @@ goroutine 2 拿到配置：数据库连接配置
 goroutine 4 拿到配置：数据库连接配置
 ```
 
-"加载配置"只出现**一次**，且一定在所有"拿到配置"之前——`once.Do` 保证函数只执行一次，其他调用原地等它执行完再继续。
+"加载配置"只出现**一次**，且一定在所有"拿到配置"之前——`once.Do` 保证函数只执行一次。
+
+### 注意点
+
+- 典型场景：全局初始化（加载配置、建立连接）
+- 其余调用会在 `once.Do` 处等待，首次执行完成后直接跳过
 
 ## 六、并发编程军规（新手版）
 
@@ -228,28 +277,38 @@ goroutine 4 拿到配置：数据库连接配置
 2. **共享了就加锁**，或改用 channel
 3. **map 不是并发安全的**：多 goroutine 同时写 map 会直接 panic（`fatal error: concurrent map writes`），必须加锁
 4. **写完并发代码必跑 `-race`**
-5. **goroutine 别开越多越好**：CPU 密集任务开太多反而慢；IO 密集任务（如网络请求）适合大量 goroutine，但要控制上限（工作池模式）
+5. **goroutine 不是越多越好**：CPU 密集任务开太多反而慢；IO 密集任务（如网络请求）适合大量 goroutine，但要控制上限（工作池模式）
 
----
+## 七、常用操作速查
 
-## 新手常见坑（报错速查表）
+| 需求 | 写法 |
+|------|------|
+| 互斥保护共享变量 | `mu.Lock()` → 临界区 → `defer mu.Unlock()` |
+| 锁 + 数据封装 | struct 内嵌 `sync.Mutex`，方法接收者用指针 |
+| 检测数据竞争 | `go run -race main.go` / `go test -race` |
+| 只执行一次 | `once.Do(func() { … })` |
+| 读多写少 | `sync.RWMutex` |
+| 等一组 goroutine 结束 | `sync.WaitGroup` |
 
-| 报错原文 / 现象 | 人话翻译 | 解决 / 原因 |
+## 新手常见坑
+
+| 现象 | 原因 | 解决 |
 |------|------|------|
 | `fatal error: concurrent map writes` | 多个 goroutine 同时写一个 map，运行时直接崩溃退出 | map 不是并发安全的：写操作用 Mutex 保护，或让单个 goroutine 独占 map |
-| `fatal error: all goroutines are asleep - deadlock!` | 忘了 Unlock（或某条路径绕过了 Unlock），所有人排队等锁 | `mu.Lock()` 下一行就写 `defer mu.Unlock()`，根治 |
+| `fatal error: all goroutines are asleep - deadlock!` | 忘了 Unlock（或某条路径绕过了 Unlock），所有 goroutine 排队等锁 | `mu.Lock()` 下一行就写 `defer mu.Unlock()`，根治 |
 | `WARNING: DATA RACE`（`go run -race` 的输出） | 检测到两个 goroutine 在无保护地同时读写同一处内存 | 按警告指出的变量和行号，加锁或改用 channel |
-| （go vet 警告）`passes lock by value` | 含 Mutex 的结构体被**拷贝**了一份，拷贝出来的锁形同虚设 | 含锁结构体一律传指针 `&s`，方法接收者用 `func (s *SafeMap)` |
-| `-race` 没报错，上线还是偶发出错 | 它只能检测**运行时实际发生**的竞争 | 测试要真实跑并发路径；没执行到的代码它看不见 |
-
----
+| `go vet` 警告 `passes lock by value` | 含 Mutex 的结构体被**拷贝**了一份，拷贝出来的锁形同虚设 | 含锁结构体一律传指针 `&s`，方法接收者用 `func (s *SafeMap)` |
+| `-race` 没报错，上线还是偶发出错 | 竞态检测器只能发现**运行时实际发生**的竞争 | 测试要真实跑并发路径；没执行到的代码它检测不到 |
 
 ## 练习
 
-1. 把本节开头的竞争示例敲一遍，用 `go run -race` 亲眼看看 DATA RACE 警告。
-2. 用 Mutex 修复它，再跑 `-race` 确认警告消失。
-3. 实现 `SafeMap` 结构体：内含 `map[string]int` 和 `sync.Mutex`，提供并发安全的 `Set(k, v)` 和 `Get(k)` 方法，开 100 个 goroutine 同时写入测试。
-4. 挑战题：用"channel + 单一计数者"方案重写练习 3。
+**1.** 把本节开头的竞争示例敲一遍，用 `go run -race` 观察 DATA RACE 警告。
+
+**2.** 用 Mutex 修复它，再跑 `-race` 确认警告消失。
+
+**3.** 实现 `SafeMap` 结构体：内含 `map[string]int` 和 `sync.Mutex`，提供并发安全的 `Set(k, v)` 和 `Get(k)` 方法，开 100 个 goroutine 同时写入测试。
+
+**4.** 挑战题：用"channel + 单一计数者"方案重写练习 3。
 
 <details>
 <summary>点击查看答案</summary>
@@ -308,7 +367,7 @@ func main() {
 }
 ```
 
-**4. 思路：** 让 map 只被**一个** goroutine 持有（单一保管员）。定义请求结构 `type setReq struct{ k string; v int }`，其他 goroutine 往 `ch := make(chan setReq)` 发请求；保管员 `for req := range ch { m[req.k] = req.v }`；全部发完后 `close(ch)`，保管员自然下班。只有保管员一人碰 map，天然无竞争，一把锁都不用。
+**4. 思路：** 让 map 只被**一个** goroutine 持有（单一保管员）。定义请求结构 `type setReq struct{ k string; v int }`，其他 goroutine 往 `ch := make(chan setReq)` 发请求；保管员 `for req := range ch { m[req.k] = req.v }`；全部发完后 `close(ch)`，保管员结束循环。只有保管员一人碰 map，天然无竞争，一把锁都不用。
 
 </details>
 
@@ -319,8 +378,6 @@ func main() {
 - map 不是并发安全的，并发写直接 `fatal error: concurrent map writes`
 - 选型口诀：保护共享状态用 Mutex，传递数据/任务用 channel，等一组结束用 WaitGroup
 
----
-
-🎉 第五章完成！goroutine + channel + sync 是 Go 并发三件套，你已经摸到了 Go 的看家本领。
+第五章到此完成，goroutine + channel + sync 是 Go 并发三件套。
 
 下一章把知识落地成真正的工程：[6.1 包与模块管理](../06-项目实战/01-packages-modules.md)
