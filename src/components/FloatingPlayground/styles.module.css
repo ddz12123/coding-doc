@@ -1,0 +1,252 @@
+/* 悬浮训练场：右下角 FAB + 可拖动 / 缩放面板；≤996px 走近全屏卡片 */
+
+.fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: calc(var(--ifm-z-index-fixed) + 5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--ifm-color-primary);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition:
+    transform var(--ifm-transition-fast) ease,
+    background var(--ifm-transition-fast) ease;
+}
+
+.fab:hover {
+  background: var(--ifm-color-primary-dark);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.panel {
+  position: fixed;
+  z-index: calc(var(--ifm-z-index-fixed) + 5);
+  /* display 由组件按展开状态切换为 flex */
+  display: none;
+  flex-direction: column;
+  min-width: 380px;
+  min-height: 320px;
+  overflow: hidden;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.35rem 0.35rem 0.9rem;
+  background: var(--ifm-color-emphasis-100);
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
+.title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.tab {
+  padding: 0.15rem 0.7rem;
+  font-size: 0.8rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ifm-color-emphasis-700);
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: var(--ifm-color-emphasis-200);
+}
+
+.tabActive,
+.tabActive:hover {
+  background: var(--ifm-color-primary);
+  color: #fff;
+}
+
+.collapseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ifm-color-emphasis-700);
+  cursor: pointer;
+}
+
+.collapseBtn:hover {
+  background: var(--ifm-color-emphasis-300);
+  color: var(--ifm-color-emphasis-900);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.runner {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  padding: 0.5rem;
+}
+
+/* 编辑器与输出约 6:4 分栏，跟随面板缩放 */
+.editorWrap {
+  flex: 1.7;
+  min-height: 0;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.outputPanel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.outputTitle {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ifm-color-emphasis-700);
+  background: var(--ifm-color-emphasis-100);
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.output {
+  flex: 1;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  overflow: auto;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  background: var(--ifm-background-surface-color);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.outputPlaceholder {
+  color: var(--ifm-color-emphasis-500);
+}
+
+.stdout {
+  color: var(--ifm-font-color-base);
+}
+
+.stderr {
+  color: var(--ifm-color-danger);
+}
+
+.system {
+  color: var(--ifm-color-emphasis-500);
+  font-style: italic;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.status {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--ifm-color-emphasis-600);
+}
+
+.status[data-status='running'] {
+  color: var(--ifm-color-primary);
+}
+
+.status[data-status='crashed'] {
+  color: var(--ifm-color-danger);
+}
+
+.resizeHandle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.resizeHandle::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--ifm-color-emphasis-400);
+  border-bottom: 2px solid var(--ifm-color-emphasis-400);
+  border-bottom-right-radius: 2px;
+}
+
+/* 移动端：面板近全屏固定，禁用拖动与缩放；
+   !important 用于压过拖动 / 缩放写入的行内样式 */
+@media (max-width: 996px) {
+  .fab {
+    right: 16px;
+    bottom: 16px;
+    width: 48px;
+    height: 48px;
+  }
+
+  .panel {
+    left: 12px !important;
+    right: 12px !important;
+    top: auto !important;
+    bottom: 12px !important;
+    width: auto !important;
+    height: min(70vh, 560px) !important;
+    min-width: 0;
+  }
+
+  .header {
+    cursor: default;
+  }
+
+  .resizeHandle {
+    display: none;
+  }
+}

@@ -109,10 +109,11 @@ const config: Config = {
     ],
   ],
 
-  // 客户端增强：页面切换进度条 + 阅读进度条
+  // 客户端增强：页面切换进度条 + 阅读进度条 + 悬浮训练场
   clientModules: [
     './src/clientModules/routeProgress.js',
     './src/clientModules/readingProgress.js',
+    './src/clientModules/floatingPlayground.tsx',
   ],
 
   themeConfig: {
